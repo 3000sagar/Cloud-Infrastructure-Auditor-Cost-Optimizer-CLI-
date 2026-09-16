@@ -1,0 +1,2 @@
+pytest>=8.0
+moto[server]>=5.0

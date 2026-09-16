@@ -1,0 +1,1 @@
+"""Rich terminal report renderer. Not yet implemented (Week 3)."""

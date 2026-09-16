@@ -1,0 +1,21 @@
+aws:
+  profile: default
+  regions:
+    - ap-south-1
+    - us-east-1
+
+audit:
+  ec2:
+    enabled: true
+    cpu_threshold: 5
+    period_days: 14
+  ebs:
+    enabled: true
+  elastic_ip:
+    enabled: true
+
+report:
+  output_directory: reports
+  formats:
+    - json
+    - csv
