@@ -1,14 +1,10 @@
-"""AWS credential resolution and client construction.
+"""AWS credential resolution.
 
-Every AWS call in this tool goes through this module. Scanners never
-call boto3.client() directly — they ask for a client here, so that
-profile selection, region targeting, and the moto endpoint override
-are handled in exactly one place.
+Uses boto3's standard credential chain (env vars, ~/.aws, IAM role).
+If an endpoint URL is given (e.g. a local moto server), dummy
+credentials are supplied when none exist, so no real account is needed.
 """
 
-from __future__ import annotations
-
-from dataclasses import dataclass
 from typing import Optional
 
 import boto3
@@ -19,89 +15,52 @@ from botocore.exceptions import (
     ProfileNotFound,
 )
 
+from cloud_auditor.utils.retry import get_boto_config
 
-class CredentialError(Exception):
-    """Raised when AWS credentials are missing, invalid, or unusable."""
+DEFAULT_REGION = "us-east-1"
 
 
-@dataclass
-class AWSContext:
-    """Resolved authentication settings for a single run of the CLI.
+class AuthError(Exception):
+    """Raised when credentials can't be resolved or verified."""
 
-    endpoint_url is what makes local development possible: when it is
-    set (e.g. http://localhost:5000), every client is pointed at a
-    moto server instead of real AWS. When it is None, boto3 talks to
-    the real thing.
-    """
 
-    profile: Optional[str] = None
-    region: Optional[str] = None
-    endpoint_url: Optional[str] = None
-
-    _session: Optional[boto3.session.Session] = None
-
-    @property
-    def session(self) -> boto3.session.Session:
-        """The boto3 Session for this run, created once and reused.
-
-        Passing profile_name=None makes boto3 fall back to its standard
-        credential chain: environment variables, then the shared
-        credentials file, then instance metadata.
-        """
-        if self._session is None:
-            try:
-                self._session = boto3.session.Session(
-                    profile_name=self.profile,
-                    region_name=self.region,
-                )
-            except ProfileNotFound as exc:
-                raise CredentialError(
-                    f"AWS profile '{self.profile}' was not found. "
-                    "Check ~/.aws/credentials or run 'aws configure --profile "
-                    f"{self.profile}'."
-                ) from exc
-        return self._session
-
-    def client(self, service_name: str, region: Optional[str] = None):
-        """Build a boto3 client for the given service.
-
-        region overrides the context's region, which matters for
-        multi-region scanning: one context, many regional clients.
-        """
-        return self.session.client(
-            service_name,
-            region_name=region or self.region,
-            endpoint_url=self.endpoint_url,
+def create_session(
+    profile: Optional[str] = None,
+    region: Optional[str] = None,
+    endpoint_url: Optional[str] = None,
+) -> boto3.Session:
+    try:
+        session = boto3.Session(
+            profile_name=profile, region_name=region or DEFAULT_REGION
         )
+    except ProfileNotFound as exc:
+        raise AuthError(f"AWS profile not found: {profile}") from exc
 
-    def verify_credentials(self) -> dict:
-        """Fail fast with a readable message instead of a traceback.
+    if endpoint_url and session.get_credentials() is None:
+        session = boto3.Session(
+            aws_access_key_id="testing",
+            aws_secret_access_key="testing",
+            region_name=region or DEFAULT_REGION,
+        )
+    return session
 
-        Calls sts:GetCallerIdentity, which needs no IAM permissions
-        beyond valid credentials, and returns the identity so the CLI
-        can show the user which account they are about to audit.
-        """
-        try:
-            identity = self.client("sts").get_caller_identity()
-        except NoCredentialsError as exc:
-            raise CredentialError(
-                "No AWS credentials found. Set AWS_ACCESS_KEY_ID and "
-                "AWS_SECRET_ACCESS_KEY, run 'aws configure', or pass "
-                "--endpoint-url to target a local moto server."
-            ) from exc
-        except ClientError as exc:
-            code = exc.response.get("Error", {}).get("Code", "Unknown")
-            raise CredentialError(
-                f"AWS rejected the credentials (error code: {code}). "
-                "They may be expired, revoked, or for the wrong account."
-            ) from exc
-        except BotoCoreError as exc:
-            raise CredentialError(
-                f"Could not reach AWS to verify credentials: {exc}"
-            ) from exc
 
-        return {
-            "account": identity.get("Account"),
-            "arn": identity.get("Arn"),
-            "user_id": identity.get("UserId"),
-        }
+def get_client(session, service, region=None, endpoint_url=None):
+    return session.client(
+        service,
+        region_name=region or session.region_name or DEFAULT_REGION,
+        endpoint_url=endpoint_url,
+        config=get_boto_config(),
+    )
+
+
+def verify_credentials(session, endpoint_url: Optional[str] = None) -> dict:
+    """Fail fast with a readable error instead of a raw traceback."""
+    try:
+        return get_client(session, "sts", endpoint_url=endpoint_url).get_caller_identity()
+    except NoCredentialsError as exc:
+        raise AuthError("No AWS credentials found. Configure a profile or env vars.") from exc
+    except ClientError as exc:
+        raise AuthError(f"AWS rejected the credentials: {exc}") from exc
+    except BotoCoreError as exc:
+        raise AuthError(f"Could not reach AWS: {exc}") from exc
