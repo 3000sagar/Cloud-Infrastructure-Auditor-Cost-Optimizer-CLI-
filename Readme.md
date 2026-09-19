@@ -10,11 +10,19 @@
 
 ---
 
+## 🚧 Project Status
+
+**Week 1 complete.** CLI scaffolding, AWS authentication, region discovery, and retry/rate-limit handling are implemented and tested (see Phase 1 in the Roadmap), plus a `whoami` command for checking which identity you're authenticated as. `audit`, `report`, and `cleanup` are registered commands that currently return "not yet implemented" — their real logic lands in Weeks 2-3. The Roadmap section is the source of truth for what's actually done.
+
+**Scope: AWS only.** GCP/Azure support is explicitly out of scope for this build.
+
+---
+
 ## 📌 Overview
 
 **Cloud Infrastructure Auditor & Cost Optimizer** is a command-line tool designed for **DevOps, Cloud Engineering, and FinOps teams** to automatically inspect cloud infrastructure and identify resources that may be unnecessarily increasing operational costs.
 
-The application connects securely to cloud providers, scans resources across regions, analyzes utilization and configuration, and generates actionable cost-optimization reports.
+The application connects securely to AWS, scans resources across regions, analyzes utilization and configuration, and generates actionable cost-optimization reports.
 
 It also provides **safe cleanup operations** using a `dry-run` mode and explicit confirmation before making destructive changes.
 
@@ -36,7 +44,7 @@ It also provides **safe cleanup operations** using a `dry-run` mode and explicit
 
 The auditor scans AWS resources for common sources of cloud waste.
 
-### Current Checks
+### Planned Checks
 
 | Resource      | Audit                            |
 | ------------- | -------------------------------- |
@@ -48,7 +56,7 @@ The auditor scans AWS resources for common sources of cloud waste.
 
 ### EC2 Underutilization
 
-The tool can identify EC2 instances with sustained CPU utilization below a configurable threshold.
+The tool identifies EC2 instances with sustained CPU utilization below a configurable threshold.
 
 Default rule:
 
@@ -65,7 +73,7 @@ This helps identify instances that may be oversized or no longer required.
 
 The tool converts audit findings into actionable cost-saving recommendations.
 
-Example:
+Target report format:
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -78,6 +86,8 @@ Example:
 │ i-0def456             │ <5% CPU     │ Review / downsize EC2  │
 └───────────────────────┴─────────────┴────────────────────────┘
 ```
+
+*(Example format — not live output.)*
 
 The generated report can contain:
 
@@ -193,7 +203,6 @@ The tool should never silently delete resources.
 ### Cloud
 
 * **Boto3** — AWS SDK
-* **Google Cloud Client Libraries** — planned GCP support
 
 ### Data
 
@@ -204,7 +213,7 @@ The tool should never silently delete resources.
 ### Testing
 
 * **pytest**
-* **moto** — AWS service mocking
+* **moto** — full local AWS emulation for both development and automated testing
 
 ### Packaging
 
@@ -326,21 +335,12 @@ cloud-auditor --help
 
 # 🔐 AWS Authentication
 
-The application uses standard AWS authentication mechanisms provided by **Boto3**.
-
-It does **not** require hardcoding AWS credentials inside the application.
+The application uses standard AWS authentication mechanisms provided by **Boto3**. It does **not** require hardcoding AWS credentials inside the application.
 
 ### Option 1 — AWS CLI Profile
 
-Configure an AWS profile:
-
 ```bash
 aws configure
-```
-
-Then run:
-
-```bash
 cloud-auditor audit --profile default
 ```
 
@@ -348,11 +348,6 @@ cloud-auditor audit --profile default
 
 ```bash
 aws configure --profile production
-```
-
-Run:
-
-```bash
 cloud-auditor audit --profile production
 ```
 
@@ -364,9 +359,9 @@ When running on AWS infrastructure such as EC2, the application can use the atta
 
 # 🔑 Required IAM Permissions
 
-The auditor should follow the **principle of least privilege**.
+The auditor follows the **principle of least privilege**.
 
-For read-only auditing, permissions may include:
+Read-only auditing:
 
 ```text
 ec2:DescribeInstances
@@ -378,9 +373,7 @@ cloudwatch:GetMetricStatistics
 cloudwatch:GetMetricData
 ```
 
-Cleanup operations require additional permissions depending on the resources being modified.
-
-For example:
+Cleanup operations require additional, separately controlled permissions, e.g.:
 
 ```text
 ec2:DeleteVolume
@@ -393,54 +386,78 @@ Never commit AWS credentials, access keys, secret keys, or `.env` files to GitHu
 
 ---
 
-# 🖥️ CLI Usage
+# 🧪 Local Development (No Live AWS Account Required)
 
-Display available commands:
+This project is developed and tested against a local AWS emulation layer using **moto**, not a live AWS account. This removes cost risk entirely during development and lets the 14-day CloudWatch utilization window be simulated instantly instead of waiting on real time.
+
+### Run a local AWS mock server
+
+```bash
+pip install moto[server]
+moto_server -p 5000
+```
+
+### Point the CLI at it
+
+```bash
+cloud-auditor --endpoint-url http://localhost:5000 whoami
+cloud-auditor --endpoint-url http://localhost:5000 regions
+```
+
+`create_session()` automatically supplies dummy credentials when `--endpoint-url` is set and no real credentials are found, so no manual `export AWS_ACCESS_KEY_ID=...` step is needed against moto.
+
+### Seed test resources
+
+Unattached EBS volumes, unassociated Elastic IPs, and EC2 instances are created directly against the mock server via boto3 — no real infrastructure is provisioned, no cost incurred.
+
+### Simulate 14 days of CloudWatch history
+
+A real EC2 instance needs 14 real days of metrics before the utilization scanner has anything to detect. Locally, this is simulated by inserting `put_metric_data` datapoints with backdated timestamps, producing a realistic 14-day low-CPU history in a single call.
+
+> A live AWS pass may still be needed before final submission if the internship's evaluation criteria require proof of a real deployment — this has not yet been confirmed.
+
+---
+
+# 🖥️ CLI Usage
 
 ```bash
 cloud-auditor --help
 ```
-
-Example:
 
 ```text
 Usage: cloud-auditor [OPTIONS] COMMAND [ARGS]...
 
 Cloud Infrastructure Auditor & Cost Optimizer
 
+Global options:
+  -p, --profile        AWS profile name
+  -r, --region          Default region
+  --endpoint-url         Point at a local moto server for development
+  --version              Show version and exit
+
 Commands:
+  whoami      Show which AWS identity the tool is authenticated as
+  regions     List the AWS regions enabled for this account
   audit       Scan cloud infrastructure
   report      Generate audit reports
   cleanup     Preview or execute cleanup operations
-  regions     List supported AWS regions
-  version     Display application version
 ```
 
----
+## 🙋 Check Your Identity
+
+```bash
+cloud-auditor whoami
+cloud-auditor --profile production whoami
+```
+
+Useful as a sanity check before running an audit against the wrong account.
 
 ## 🔎 Run an Audit
 
-Scan the default AWS profile:
-
 ```bash
 cloud-auditor audit
-```
-
-Scan a specific profile:
-
-```bash
 cloud-auditor audit --profile production
-```
-
-Scan a specific region:
-
-```bash
 cloud-auditor audit --region ap-south-1
-```
-
-Scan multiple regions:
-
-```bash
 cloud-auditor audit --regions ap-south-1,us-east-1,eu-west-1
 ```
 
@@ -454,22 +471,10 @@ cloud-auditor audit --regions ap-south-1,us-east-1,eu-west-1
 cloud-auditor report --format json
 ```
 
-Output:
-
-```text
-reports/audit-report.json
-```
-
 ### CSV
 
 ```bash
 cloud-auditor report --format csv
-```
-
-Output:
-
-```text
-reports/audit-report.csv
 ```
 
 ### Terminal
@@ -483,8 +488,6 @@ Rich terminal tables provide an easy-to-read overview of detected issues.
 ---
 
 # 🧹 Cleanup Workflow
-
-The recommended workflow is:
 
 ```text
 AUDIT
@@ -500,15 +503,8 @@ USER CONFIRMATION
 EXECUTE
 ```
 
-Example:
-
 ```bash
 cloud-auditor cleanup --dry-run
-```
-
-After reviewing the results:
-
-```bash
 cloud-auditor cleanup --execute
 ```
 
@@ -517,10 +513,6 @@ The application should request explicit confirmation before destructive operatio
 ---
 
 # ⚙️ Configuration
-
-Configuration can be managed through YAML.
-
-Example:
 
 ```yaml
 aws:
@@ -549,68 +541,27 @@ report:
     - csv
 ```
 
-This allows teams to customize scanning behavior without modifying source code.
-
 ---
 
 # 🧪 Testing
 
-The project uses `pytest` for automated testing.
-
-AWS services are mocked using **moto**, preventing accidental AWS charges during tests.
-
-Run all tests:
+The project uses `pytest` for automated testing. AWS services are mocked using **moto**, both during automated tests and during day-to-day development (see Local Development above) — no real AWS account is used at any point in the build.
 
 ```bash
 pytest
-```
-
-Run with verbose output:
-
-```bash
 pytest -v
-```
-
-Example:
-
-```text
-============================= test session starts =============================
-
-tests/test_ec2.py ........
-tests/test_ebs.py ........
-tests/test_elastic_ip.py ...
-tests/test_cleanup.py .....
-
-============================== 24 passed ==============================
 ```
 
 ---
 
 # 📦 Build Standalone Executable
 
-Install PyInstaller:
-
 ```bash
 pip install pyinstaller
-```
-
-Build the executable:
-
-```bash
 pyinstaller --onefile cloud_auditor/cli.py
 ```
 
-The executable will be generated inside:
-
-```text
-dist/
-```
-
-Example:
-
-```bash
-dist/cloud-auditor
-```
+Output: `dist/cloud-auditor`
 
 ---
 
@@ -629,22 +580,12 @@ dist/cloud-auditor
 
 Potential Monthly Savings: $XX.XX
 
-Resources Audited: 47
-Issues Found:       8
-Optimization Score: 83%
+Resources Audited: NN
+Issues Found:       N
+Optimization Score: NN%
 ```
 
----
-
-# 🌎 Supported Cloud Providers
-
-| Provider     | Status            |
-| ------------ | ----------------- |
-| AWS          | 🚧 In Development |
-| Google Cloud | 🔮 Planned        |
-| Azure        | 🔮 Future         |
-
-The architecture is designed to allow additional cloud providers to be integrated through provider-specific scanner modules.
+*(Illustrative target format — not actual output. Will be replaced with real results once the audit engine runs.)*
 
 ---
 
@@ -654,9 +595,9 @@ The architecture is designed to allow additional cloud providers to be integrate
 
 * [x] Project architecture
 * [x] Typer CLI
-* [ ] AWS authentication
-* [ ] AWS region discovery
-* [ ] Retry/rate-limit handling
+* [x] AWS authentication
+* [x] AWS region discovery
+* [x] Retry/rate-limit handling
 
 ## Phase 2 — Audit Engine
 
@@ -684,19 +625,12 @@ The architecture is designed to allow additional cloud providers to be integrate
 
 ## Phase 5 — Quality & Distribution
 
-* [ ] Unit tests with moto
+* [ ] Unit/local-dev tests with moto
 * [ ] Integration tests
 * [ ] PyInstaller packaging
 * [ ] Documentation
 * [ ] CI/CD
 * [ ] PyPI/internal package distribution
-
-## Phase 6 — Multi-Cloud
-
-* [ ] GCP integration
-* [ ] GCP resource scanners
-* [ ] Unified cloud reporting
-* [ ] Cross-cloud cost optimization
 
 ---
 
@@ -742,9 +676,7 @@ The architecture is designed to allow additional cloud providers to be integrate
 
 # 🔒 Security Considerations
 
-Security is a core requirement of this project.
-
-### The application should:
+The application should:
 
 * Never store AWS secret keys in source code.
 * Use the AWS credential provider chain.
@@ -756,7 +688,7 @@ Security is a core requirement of this project.
 * Validate resource IDs before cleanup.
 * Handle AWS API failures safely.
 
-### Never commit:
+Never commit:
 
 ```text
 .env
@@ -766,8 +698,6 @@ secret keys
 private keys
 AWS configuration containing secrets
 ```
-
-Add sensitive files to `.gitignore`.
 
 ---
 
@@ -791,55 +721,9 @@ The authors are not responsible for infrastructure damage, service interruption,
 
 ---
 
-# 🤝 Contributing
-
-Contributions are welcome.
-
-### 1. Fork the repository
-
-```bash
-git clone https://github.com/YOUR_USERNAME/cloud-infrastructure-auditor.git
-```
-
-### 2. Create a branch
-
-```bash
-git checkout -b feature/new-scanner
-```
-
-### 3. Make your changes
-
-Follow the existing project structure and coding conventions.
-
-### 4. Run tests
-
-```bash
-pytest
-```
-
-### 5. Commit
-
-```bash
-git add .
-
-git commit -m "Add new infrastructure scanner"
-```
-
-### 6. Push
-
-```bash
-git push origin feature/new-scanner
-```
-
-Then open a Pull Request.
-
----
-
 # 📄 License
 
-This project is licensed under the **MIT License**.
-
-See the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
 ---
 
@@ -847,12 +731,4 @@ See the [LICENSE](LICENSE) file for details.
 
 **Sagar**
 
-Built with Python, AWS, Boto3, Typer, Rich, and a strong obsession with eliminating unnecessary cloud bills. ☁️💸
-
----
-
-## ⭐ Support
-
-If you find this project useful, consider giving the repository a ⭐ on GitHub.
-
-**Cloud waste adds up quietly. This tool is built to make it visible.**
+Built with Python, AWS, Boto3, Typer, and Rich.

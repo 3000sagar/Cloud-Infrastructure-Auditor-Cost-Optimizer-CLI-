@@ -53,8 +53,13 @@ def _authenticated_session(ctx: typer.Context):
 @app.command()
 def whoami(ctx: typer.Context) -> None:
     """Show which AWS identity the tool is authenticated as."""
-    session = _authenticated_session(ctx)
-    identity = verify_credentials(session, ctx.obj["endpoint_url"])
+    opts = ctx.obj
+    try:
+        session = create_session(opts["profile"], opts["region"], opts["endpoint_url"])
+        identity = verify_credentials(session, opts["endpoint_url"])
+    except AuthError as exc:
+        console.print(f"[red]Auth error:[/red] {exc}")
+        raise typer.Exit(code=1)
     console.print(f"Account: {identity['Account']}")
     console.print(f"ARN:     {identity['Arn']}")
 
