@@ -1,11 +1,18 @@
-"""Base interface all resource scanners implement.
+"""Shared types used by every resource scanner."""
 
-Not yet implemented (Week 2). Each concrete scanner (EC2, EBS,
-Elastic IP) will subclass this and return a list of Finding objects
-for the reporting layer to consume.
-"""
+from dataclasses import dataclass
 
 
-class BaseScanner:
-    def scan(self, ctx):
-        raise NotImplementedError("Scanners land in Week 2.")
+@dataclass
+class Finding:
+    """A single audit finding -- one flagged resource."""
+
+    resource_id: str
+    resource_type: str
+    region: str
+    issue: str
+    recommendation: str
+
+
+class ScannerError(Exception):
+    """Raised when a scanner can't complete its scan."""
