@@ -8,6 +8,8 @@ from rich.table import Table
 
 from cloud_auditor import __version__
 from cloud_auditor.auth.aws import AuthError, create_session, verify_credentials
+from cloud_auditor.audit.orchestrator import run_audit
+from cloud_auditor.scanners.base import ScannerError
 from cloud_auditor.utils.regions import RegionDiscoveryError, get_enabled_regions
 
 app = typer.Typer(
@@ -85,11 +87,55 @@ def _not_implemented(feature: str, week: int) -> None:
     console.print(f"[yellow]{feature} is not implemented yet (planned for Week {week}).[/yellow]")
     raise typer.Exit(code=1)
 
-
 @app.command()
 def audit(ctx: typer.Context) -> None:
     """Scan for idle EC2, unattached EBS and unassociated Elastic IPs."""
-    _not_implemented("audit", 2)
+    session = _authenticated_session(ctx)
+
+    try:
+        regions = get_enabled_regions(
+            session,
+            ctx.obj["endpoint_url"],
+        )
+    except RegionDiscoveryError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1)
+
+    console.print(
+        f"[bold]Scanning {len(regions)} enabled AWS region(s)...[/bold]"
+    )
+
+    try:
+        findings = run_audit(
+            session=session,
+            regions=regions,
+            endpoint_url=ctx.obj["endpoint_url"],
+        )
+    except ScannerError as exc:
+        console.print(f"[red]Scan error:[/red] {exc}")
+        raise typer.Exit(code=1)
+
+    if not findings:
+        console.print("[green]No audit findings detected.[/green]")
+        return
+
+    table = Table(title=f"Audit findings ({len(findings)})")
+    table.add_column("Resource ID")
+    table.add_column("Type")
+    table.add_column("Region")
+    table.add_column("Issue")
+    table.add_column("Recommendation")
+
+    for finding in findings:
+        table.add_row(
+            finding.resource_id,
+            finding.resource_type,
+            finding.region,
+            finding.issue,
+            finding.recommendation,
+        )
+
+    console.print(table)
 
 
 @app.command()
