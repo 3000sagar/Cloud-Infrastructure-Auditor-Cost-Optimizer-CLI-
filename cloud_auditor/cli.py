@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from cloud_auditor import __version__
+from cloud_auditor.scanners.aggregator import run_all_scanners
 from cloud_auditor.auth.aws import AuthError, create_session, verify_credentials
 from cloud_auditor.utils.regions import RegionDiscoveryError, get_enabled_regions
 
@@ -86,10 +87,39 @@ def _not_implemented(feature: str, week: int) -> None:
     raise typer.Exit(code=1)
 
 
+
 @app.command()
 def audit(ctx: typer.Context) -> None:
     """Scan for idle EC2, unattached EBS and unassociated Elastic IPs."""
-    _not_implemented("audit", 2)
+    session = _authenticated_session(ctx)
+    region = session.region_name
+
+    findings = run_all_scanners(session, region, ctx.obj["endpoint_url"])
+
+    if not findings:
+        console.print("[green]No issues found.[/green]")
+        raise typer.Exit(code=0)
+
+    table = Table(title=f"Audit findings ({len(findings)})")
+    table.add_column("Type")
+    # AWS resource IDs run up to ~30 chars (eipalloc-xxxxxxxxxxxxxxxxx is the
+    # longest). no_wrap here + a wide enough Console below means an ID is
+    # never split across lines or truncated with an ellipsis -- a user has
+    # to be able to copy the exact ID off this table to act on it.
+    table.add_column("Resource", no_wrap=True)
+    table.add_column("Issue")
+    table.add_column("Recommendation")
+    for finding in findings:
+        table.add_row(
+            finding.resource_type,
+            finding.resource_id,
+            finding.issue,
+            finding.recommendation,
+        )
+    # Fixed width regardless of the detected terminal size, specifically so
+    # resource IDs stay intact even when run under a narrow terminal or a
+    # test runner that reports a small default width.
+    Console(width=120).print(table)
 
 
 @app.command()
