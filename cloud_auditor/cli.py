@@ -31,10 +31,16 @@ def main(
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="AWS profile name."),
     region: Optional[str] = typer.Option(None, "--region", "-r", help="Default region."),
     endpoint_url: Optional[str] = typer.Option(
-        None, "--endpoint-url", help="Custom endpoint, e.g. http://127.0.0.1:5000 for moto."
+        None,
+        "--endpoint-url",
+        help="Custom endpoint, e.g. http://127.0.0.1:5000 for moto.",
     ),
     version: bool = typer.Option(
-        False, "--version", callback=_version_callback, is_eager=True, help="Show version."
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show version.",
     ),
 ) -> None:
     """Global options shared by every command."""
@@ -62,6 +68,7 @@ def whoami(ctx: typer.Context) -> None:
     except AuthError as exc:
         console.print(f"[red]Auth error:[/red] {exc}")
         raise typer.Exit(code=1)
+
     console.print(f"Account: {identity['Account']}")
     console.print(f"ARN:     {identity['Arn']}")
 
@@ -70,6 +77,7 @@ def whoami(ctx: typer.Context) -> None:
 def regions(ctx: typer.Context) -> None:
     """List the AWS regions enabled for this account."""
     session = _authenticated_session(ctx)
+
     try:
         names = get_enabled_regions(session, ctx.obj["endpoint_url"])
     except RegionDiscoveryError as exc:
@@ -78,14 +86,20 @@ def regions(ctx: typer.Context) -> None:
 
     table = Table(title=f"Enabled regions ({len(names)})")
     table.add_column("Region")
+
     for name in names:
         table.add_row(name)
+
     console.print(table)
 
 
 def _not_implemented(feature: str, week: int) -> None:
-    console.print(f"[yellow]{feature} is not implemented yet (planned for Week {week}).[/yellow]")
+    console.print(
+        f"[yellow]{feature} is not implemented yet "
+        f"(planned for Week {week}).[/yellow]"
+    )
     raise typer.Exit(code=1)
+
 
 @app.command()
 def audit(ctx: typer.Context) -> None:
@@ -120,7 +134,7 @@ def audit(ctx: typer.Context) -> None:
         return
 
     table = Table(title=f"Audit findings ({len(findings)})")
-    table.add_column("Resource ID")
+    table.add_column("Resource ID", no_wrap=True)
     table.add_column("Type")
     table.add_column("Region")
     table.add_column("Issue")
