@@ -601,16 +601,16 @@ Optimization Score: NN%
 
 ## Phase 2 — Audit Engine
 
-* [ ] Unattached EBS detection
-* [ ] Unassociated Elastic IP detection
-* [ ] EC2 utilization analysis
-* [ ] CloudWatch integration
+* [x] Unattached EBS detection
+* [x] Unassociated Elastic IP detection
+* [x] EC2 utilization analysis
+* [x] CloudWatch integration
 * [ ] Multi-region scanning
 
 ## Phase 3 — Reporting
 
 * [ ] Rich terminal reports
-* [ ] JSON export
+* [x] JSON export
 * [ ] CSV export
 * [ ] Cost-saving recommendations
 * [ ] Optimization scoring
