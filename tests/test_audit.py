@@ -31,15 +31,15 @@ def test_run_audit_combines_findings_from_all_scanners():
 
     with (
         patch(
-            "cloud_auditor.audit.orchestrator.scan_unattached_volumes",
+            "cloud_auditor.scanners.aggregator.scan_unattached_volumes",
             return_value=[ebs_finding],
         ),
         patch(
-            "cloud_auditor.audit.orchestrator.scan_unassociated_addresses",
+            "cloud_auditor.scanners.aggregator.scan_unassociated_addresses",
             return_value=[eip_finding],
         ),
         patch(
-            "cloud_auditor.audit.orchestrator.scan_underutilized_instances",
+            "cloud_auditor.scanners.aggregator.scan_underutilized_instances",
             return_value=[ec2_finding],
         ),
     ):
