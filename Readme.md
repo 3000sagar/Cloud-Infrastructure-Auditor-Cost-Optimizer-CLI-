@@ -1,523 +1,302 @@
-# â˜ï¸ Cloud Infrastructure Auditor & Cost Optimizer
+# Cloud Infrastructure Auditor & Cost Optimizer
 
-> **A professional-grade Python CLI for auditing AWS infrastructure, identifying waste and misconfigurations, estimating potential cost savings, and safely cleaning up unused cloud resources.**
+> A Python CLI for auditing AWS infrastructure, identifying common sources of cloud waste, and exporting audit findings to JSON or CSV.
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![AWS](https://img.shields.io/badge/AWS-Boto3-orange?logo=amazon-aws)](https://aws.amazon.com/sdk-for-python/)
 [![CLI](https://img.shields.io/badge/CLI-Typer-009688)](https://typer.tiangolo.com/)
-[![Rich](https://img.shields.io/badge/Terminal-Rich-purple)](https://rich.readthedocs.io/)
+[![Terminal](https://img.shields.io/badge/Terminal-Rich-purple)](https://rich.readthedocs.io/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
 
-## ðŸš§ Project Status
+## Project Status
 
-**Week 1 complete.** CLI scaffolding, AWS authentication, region discovery, and retry/rate-limit handling are implemented and tested (see Phase 1 in the Roadmap), plus a `whoami` command for checking which identity you're authenticated as. `audit`, `report`, and `cleanup` are registered commands that currently return "not yet implemented" â€” their real logic lands in Weeks 2-3. The Roadmap section is the source of truth for what's actually done.
+The current `main` branch contains a working AWS audit pipeline for:
 
-**Scope: AWS only.** GCP/Azure support is explicitly out of scope for this build.
+- AWS credential verification and identity checks
+- Enabled-region discovery
+- Multi-region auditing
+- Unattached EBS volume detection
+- Unassociated Elastic IP detection
+- EC2 CPU-utilization analysis using CloudWatch
+- JSON report export
+- CSV report export
+- Retry/backoff configuration
+- Automated tests using `pytest` and `moto`
+
+The following parts are currently **not implemented**:
+
+- Destructive cleanup execution
+- Dry-run/confirmation cleanup workflow
+- Rich terminal report export via `report --format terminal`
+- Cost-savings calculation
+- Optimization scoring
+- PyInstaller distribution workflow
+- CI/CD pipeline
+- PyPI/internal package distribution
+
+**Scope:** AWS only. GCP and Azure are not implemented in this repository.
 
 ---
 
-## ðŸ“Œ Overview
+## Overview
 
-**Cloud Infrastructure Auditor & Cost Optimizer** is a command-line tool designed for **DevOps, Cloud Engineering, and FinOps teams** to automatically inspect cloud infrastructure and identify resources that may be unnecessarily increasing operational costs.
+**Cloud Infrastructure Auditor & Cost Optimizer** is a command-line tool for DevOps, Cloud Engineering, and FinOps workflows.
 
-The application connects securely to AWS, scans resources across regions, analyzes utilization and configuration, and generates actionable cost-optimization reports.
+It connects to AWS through Boto3 and scans the selected region(s) for three currently supported finding types:
 
-It also provides **safe cleanup operations** using a `dry-run` mode and explicit confirmation before making destructive changes.
+1. Unattached EBS volumes
+2. Unassociated Elastic IP addresses
+3. Running EC2 instances with average CPU utilization below a configurable threshold over a configurable time window
 
-### ðŸŽ¯ Key Goals
+Audit findings can be exported as JSON or CSV for further review.
 
-* Identify unused and orphaned cloud resources.
-* Detect underutilized infrastructure.
-* Highlight potentially misconfigured resources.
-* Estimate potential monthly cost savings.
-* Provide actionable cleanup recommendations.
-* Support multi-region infrastructure auditing.
-* Prevent accidental resource deletion through safe execution workflows.
+The project is also designed to run locally with `moto`, allowing AWS API interactions to be tested without provisioning real AWS resources.
 
 ---
 
-# ðŸš€ Features
+## Current Features
 
-## ðŸ” Infrastructure Auditing
+### AWS Authentication
 
-The auditor scans AWS resources for common sources of cloud waste.
+The project uses Boto3's standard credential resolution mechanisms.
 
-### Planned Checks
+Supported approaches include:
 
-| Resource      | Audit                            |
-| ------------- | -------------------------------- |
-| EC2 Instances | Detect low CPU utilization       |
-| EBS Volumes   | Detect unattached volumes        |
-| Elastic IPs   | Detect unassociated Elastic IPs  |
-| AWS Regions   | Scan multiple configured regions |
-| CloudWatch    | Analyze EC2 utilization metrics  |
+- AWS environment variables
+- AWS CLI profiles
+- IAM roles and the normal AWS credential provider chain
+- Local test credentials when a custom `--endpoint-url` is used and no credentials are available
 
-### EC2 Underutilization
+Use `whoami` to verify the identity before auditing an account.
 
-The tool identifies EC2 instances with sustained CPU utilization below a configurable threshold.
+### Region Discovery
 
-Default rule:
+When no `--region` is supplied, the CLI discovers enabled AWS regions through EC2 `DescribeRegions` and audits every returned region.
+
+When `--region` is supplied, only that region is scanned.
+
+### EBS Scanner
+
+The EBS scanner searches for volumes whose AWS status is `available`, which represents unattached EBS volumes.
+
+Finding recommendation:
+
+`Delete, or snapshot then delete, if genuinely unused`
+
+### Elastic IP Scanner
+
+The Elastic IP scanner calls `DescribeAddresses` and flags addresses without an `AssociationId`.
+
+Finding recommendation:
+
+`Release the address if it's genuinely unused`
+
+### EC2 Utilization Scanner
+
+The EC2 scanner examines running instances and retrieves CloudWatch `AWS/EC2` `CPUUtilization` metrics.
+
+Default configuration:
+
+| Setting | Default |
+| --- | ---: |
+| CPU threshold | 5% |
+| Analysis period | 14 days |
+| CloudWatch period | 86,400 seconds |
+
+An instance is flagged when its average returned CPU datapoints are below the configured threshold.
+
+Instances with no datapoints in the requested period are skipped because there is not enough information to classify them as underutilized.
+
+---
+
+## Audit Flow
 
 ```text
-CPU Utilization < 5%
-Analysis Period = 14 Days
+CLI
+ │
+ ├── Authenticate with AWS
+ │
+ ├── Discover regions (unless --region is supplied)
+ │
+ └── For each region
+      │
+      ├── EBS scanner
+      ├── Elastic IP scanner
+      └── EC2 + CloudWatch scanner
+             │
+             ▼
+        Combined findings
+             │
+        ┌────┴────┐
+        ▼         ▼
+      JSON       CSV
 ```
 
-This helps identify instances that may be oversized or no longer required.
+A scanner failure in one resource category is converted into a scanner finding so the remaining scanners can continue.
 
 ---
 
-# ðŸ’° Cost Optimization
+## CLI Usage
 
-The tool converts audit findings into actionable cost-saving recommendations.
-
-Target report format:
-
-```text
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚                  COST OPTIMIZATION REPORT                    â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚ Resource              â”‚ Issue       â”‚ Recommendation         â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚ vol-0abc123           â”‚ Unattached  â”‚ Delete EBS volume      â”‚
-â”‚ eipalloc-xyz          â”‚ Unused      â”‚ Release Elastic IP     â”‚
-â”‚ i-0def456             â”‚ <5% CPU     â”‚ Review / downsize EC2  â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-```
-
-*(Example format â€” not live output.)*
-
-The generated report can contain:
-
-* Resource ID
-* Resource type
-* Region
-* Current configuration
-* Detected issue
-* Utilization information
-* Recommended action
-* Estimated savings
-* Risk level
-
-> **Note:** Cost estimates are recommendations and should be verified against the AWS Billing/Cost Explorer data before making infrastructure changes.
-
----
-
-# ðŸ›¡ï¸ Safe Cleanup
-
-Infrastructure cleanup can be dangerous.
-
-This project therefore separates **auditing** from **execution**.
-
-### Dry Run
-
-Preview the actions without modifying AWS resources:
-
-```bash
-cloud-auditor cleanup --dry-run
-```
-
-Example:
-
-```text
-DRY RUN
-
-The following resources would be removed:
-
-[1] EBS Volume: vol-0123456789
-    Region: ap-south-1
-    Status: unattached
-
-[2] Elastic IP: 13.233.xxx.xxx
-    Region: ap-south-1
-    Status: unassociated
-
-No changes have been made.
-```
-
-### Execute
-
-Actual cleanup requires explicit confirmation:
-
-```bash
-cloud-auditor cleanup --execute
-```
-
-The tool should never silently delete resources.
-
----
-
-# ðŸ—ï¸ Architecture
-
-```text
-                         â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-                         â”‚       CLI User      â”‚
-                         â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-                                    â”‚
-                                    â–¼
-                         â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-                         â”‚    Typer CLI Layer  â”‚
-                         â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-                                    â”‚
-                    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-                    â”‚               â”‚               â”‚
-                    â–¼               â–¼               â–¼
-              Authentication    Audit Engine     Reporting
-                    â”‚               â”‚               â”‚
-                    â–¼               â–¼               â–¼
-               AWS Profiles      EC2 Scanner      Rich Tables
-               IAM Roles         EBS Scanner      JSON
-                                 EIP Scanner      CSV
-                                      â”‚
-                                      â–¼
-                              â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-                              â”‚  CloudWatch   â”‚
-                              â”‚    Metrics    â”‚
-                              â””â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”˜
-                                      â”‚
-                                      â–¼
-                              â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-                              â”‚ Recommendationsâ”‚
-                              â””â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”˜
-                                      â”‚
-                             â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”
-                             â–¼                 â–¼
-                         Dry Run            Execute
-                             â”‚                 â”‚
-                             â–¼                 â–¼
-                         Preview         AWS Resources
-```
-
----
-
-# ðŸ§° Tech Stack
-
-### Core
-
-* **Python 3.10+**
-* **Typer** â€” CLI framework
-* **Rich** â€” terminal UI and formatting
-
-### Cloud
-
-* **Boto3** â€” AWS SDK
-
-### Data
-
-* **PyYAML** â€” configuration
-* **JSON** â€” report serialization
-* **CSV** â€” management reports
-
-### Testing
-
-* **pytest**
-* **moto** â€” full local AWS emulation for both development and automated testing
-
-### Packaging
-
-* **Setuptools**
-* **PyInstaller**
-
----
-
-# ðŸ“ Project Structure
-
-```text
-cloud-infrastructure-auditor/
-â”‚
-â”œâ”€â”€ cloud_auditor/
-â”‚   â”œâ”€â”€ __init__.py
-â”‚   â”œâ”€â”€ cli.py
-â”‚   â”‚
-â”‚   â”œâ”€â”€ auth/
-â”‚   â”‚   â”œâ”€â”€ __init__.py
-â”‚   â”‚   â””â”€â”€ aws.py
-â”‚   â”‚
-â”‚   â”œâ”€â”€ scanners/
-â”‚   â”‚   â”œâ”€â”€ __init__.py
-â”‚   â”‚   â”œâ”€â”€ ec2.py
-â”‚   â”‚   â”œâ”€â”€ ebs.py
-â”‚   â”‚   â”œâ”€â”€ elastic_ip.py
-â”‚   â”‚   â””â”€â”€ base.py
-â”‚   â”‚
-â”‚   â”œâ”€â”€ analysis/
-â”‚   â”‚   â”œâ”€â”€ __init__.py
-â”‚   â”‚   â”œâ”€â”€ utilization.py
-â”‚   â”‚   â””â”€â”€ recommendations.py
-â”‚   â”‚
-â”‚   â”œâ”€â”€ cleanup/
-â”‚   â”‚   â”œâ”€â”€ __init__.py
-â”‚   â”‚   â””â”€â”€ executor.py
-â”‚   â”‚
-â”‚   â”œâ”€â”€ reporting/
-â”‚   â”‚   â”œâ”€â”€ __init__.py
-â”‚   â”‚   â”œâ”€â”€ rich_report.py
-â”‚   â”‚   â”œâ”€â”€ json_report.py
-â”‚   â”‚   â””â”€â”€ csv_report.py
-â”‚   â”‚
-â”‚   â””â”€â”€ utils/
-â”‚       â”œâ”€â”€ __init__.py
-â”‚       â”œâ”€â”€ regions.py
-â”‚       â””â”€â”€ retry.py
-â”‚
-â”œâ”€â”€ tests/
-â”‚   â”œâ”€â”€ test_ec2.py
-â”‚   â”œâ”€â”€ test_ebs.py
-â”‚   â”œâ”€â”€ test_elastic_ip.py
-â”‚   â””â”€â”€ test_cleanup.py
-â”‚
-â”œâ”€â”€ config/
-â”‚   â””â”€â”€ config.yaml
-â”‚
-â”œâ”€â”€ reports/
-â”‚
-â”œâ”€â”€ .gitignore
-â”œâ”€â”€ requirements.txt
-â”œâ”€â”€ setup.py
-â”œâ”€â”€ pyproject.toml
-â”œâ”€â”€ LICENSE
-â””â”€â”€ README.md
-```
-
-> The structure may evolve as the project develops.
-
----
-
-# âš™ï¸ Installation
-
-## 1. Clone the repository
-
-```bash
-git clone https://github.com/YOUR_USERNAME/cloud-infrastructure-auditor.git
-
-cd cloud-infrastructure-auditor
-```
-
-## 2. Create a virtual environment
-
-### Windows
-
-```bash
-python -m venv venv
-
-venv\Scripts\activate
-```
-
-### Linux / macOS
-
-```bash
-python3 -m venv venv
-
-source venv/bin/activate
-```
-
-## 3. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-## 4. Install the CLI locally
-
-```bash
-pip install -e .
-```
-
-Verify the installation:
+After installation:
 
 ```bash
 cloud-auditor --help
 ```
 
----
-
-# ðŸ” AWS Authentication
-
-The application uses standard AWS authentication mechanisms provided by **Boto3**. It does **not** require hardcoding AWS credentials inside the application.
-
-### Option 1 â€” AWS CLI Profile
-
-```bash
-aws configure
-cloud-auditor audit --profile default
-```
-
-### Option 2 â€” Named AWS Profile
-
-```bash
-aws configure --profile production
-cloud-auditor audit --profile production
-```
-
-### Option 3 â€” IAM Role
-
-When running on AWS infrastructure such as EC2, the application can use the attached IAM role through the standard AWS credential provider chain.
-
----
-
-# ðŸ”‘ Required IAM Permissions
-
-The auditor follows the **principle of least privilege**.
-
-Read-only auditing:
+### Global Options
 
 ```text
-ec2:DescribeInstances
-ec2:DescribeVolumes
-ec2:DescribeAddresses
-ec2:DescribeRegions
-
-cloudwatch:GetMetricStatistics
-cloudwatch:GetMetricData
+-p, --profile       AWS profile name
+-r, --region        Region to scan
+--endpoint-url      Custom AWS-compatible endpoint, e.g. a local moto server
+--version           Show the installed version
 ```
 
-Cleanup operations require additional, separately controlled permissions, e.g.:
-
-```text
-ec2:DeleteVolume
-ec2:ReleaseAddress
-```
-
-> **Recommendation:** Use a read-only IAM policy for normal auditing and a separately controlled role/policy for cleanup operations.
-
-Never commit AWS credentials, access keys, secret keys, or `.env` files to GitHub.
-
----
-
-# ðŸ§ª Local Development (No Live AWS Account Required)
-
-This project is developed and tested against a local AWS emulation layer using **moto**, not a live AWS account. This removes cost risk entirely during development and lets the 14-day CloudWatch utilization window be simulated instantly instead of waiting on real time.
-
-### Run a local AWS mock server
-
-```bash
-pip install moto[server]
-moto_server -p 5000
-```
-
-### Point the CLI at it
-
-```bash
-cloud-auditor --endpoint-url http://localhost:5000 whoami
-cloud-auditor --endpoint-url http://localhost:5000 regions
-```
-
-`create_session()` automatically supplies dummy credentials when `--endpoint-url` is set and no real credentials are found, so no manual `export AWS_ACCESS_KEY_ID=...` step is needed against moto.
-
-### Seed test resources
-
-Unattached EBS volumes, unassociated Elastic IPs, and EC2 instances are created directly against the mock server via boto3 â€” no real infrastructure is provisioned, no cost incurred.
-
-### Simulate 14 days of CloudWatch history
-
-A real EC2 instance needs 14 real days of metrics before the utilization scanner has anything to detect. Locally, this is simulated by inserting `put_metric_data` datapoints with backdated timestamps, producing a realistic 14-day low-CPU history in a single call.
-
-> A live AWS pass may still be needed before final submission if the internship's evaluation criteria require proof of a real deployment â€” this has not yet been confirmed.
-
----
-
-# ðŸ–¥ï¸ CLI Usage
-
-```bash
-cloud-auditor --help
-```
-
-```text
-Usage: cloud-auditor [OPTIONS] COMMAND [ARGS]...
-
-Cloud Infrastructure Auditor & Cost Optimizer
-
-Global options:
-  -p, --profile        AWS profile name
-  -r, --region          Default region
-  --endpoint-url         Point at a local moto server for development
-  --version              Show version and exit
-
-Commands:
-  whoami      Show which AWS identity the tool is authenticated as
-  regions     List the AWS regions enabled for this account
-  audit       Scan cloud infrastructure
-  report      Generate audit reports
-  cleanup     Preview or execute cleanup operations
-```
-
-## ðŸ™‹ Check Your Identity
+### Check AWS Identity
 
 ```bash
 cloud-auditor whoami
 cloud-auditor --profile production whoami
 ```
 
-Useful as a sanity check before running an audit against the wrong account.
+### List Enabled Regions
 
-## ðŸ”Ž Run an Audit
+```bash
+cloud-auditor regions
+```
+
+### Run an Audit
+
+Scan all regions returned by AWS:
 
 ```bash
 cloud-auditor audit
-cloud-auditor audit --profile production
-cloud-auditor audit --region ap-south-1
-cloud-auditor audit --regions ap-south-1,us-east-1,eu-west-1
 ```
+
+Scan a specific region:
+
+```bash
+cloud-auditor --region ap-south-1 audit
+```
+
+Use a named AWS profile:
+
+```bash
+cloud-auditor --profile production audit
+```
+
+The CLI option is `--region`, singular. The repository does not currently expose a `--regions` comma-separated option.
 
 ---
 
-# ðŸ“Š Generate Reports
+## Reports
 
 ### JSON
+
+JSON export is implemented:
 
 ```bash
 cloud-auditor report --format json
 ```
 
+Default file:
+
+```text
+reports/audit-report.json
+```
+
+You can choose another output directory:
+
+```bash
+cloud-auditor report --format json --output-dir reports
+```
+
+The JSON report includes:
+
+- Generation timestamp
+- Regions scanned
+- Total finding count
+- Finding counts by resource type
+- Individual findings
+
 ### CSV
+
+CSV export is implemented:
 
 ```bash
 cloud-auditor report --format csv
 ```
 
-### Terminal
+Default file:
+
+```text
+reports/audit-report.csv
+```
+
+The CSV contains one row per finding with these fields:
+
+```text
+resource_id
+resource_type
+region
+issue
+recommendation
+```
+
+### Terminal Report
+
+The CLI accepts `terminal` as a report format, but terminal report export is **not implemented yet**:
 
 ```bash
 cloud-auditor report --format terminal
 ```
 
-Rich terminal tables provide an easy-to-read overview of detected issues.
+At the moment, this exits with a clear "not implemented yet" message.
 
 ---
 
-# ðŸ§¹ Cleanup Workflow
+## Cleanup Status
+
+Cleanup code is currently a stub.
+
+The repository does **not** currently delete AWS resources, and the CLI command:
+
+```bash
+cloud-auditor cleanup
+```
+
+reports that cleanup is not implemented.
+
+The intended future workflow is:
 
 ```text
 AUDIT
-  â†“
+  ↓
 REVIEW FINDINGS
-  â†“
-GENERATE REPORT
-  â†“
+  ↓
 DRY RUN
-  â†“
+  ↓
 USER CONFIRMATION
-  â†“
+  ↓
 EXECUTE
 ```
 
-```bash
-cloud-auditor cleanup --dry-run
-cloud-auditor cleanup --execute
-```
-
-The application should request explicit confirmation before destructive operations.
+Do not treat the cleanup examples from older documentation as available functionality on the current `main` branch.
 
 ---
 
-# âš™ï¸ Configuration
+## Configuration
+
+The repository currently uses `config/config.yaml` for audit settings.
+
+Current configuration:
 
 ```yaml
 aws:
   profile: default
-
   regions:
     - ap-south-1
     - us-east-1
@@ -527,10 +306,8 @@ audit:
     enabled: true
     cpu_threshold: 5
     period_days: 14
-
   ebs:
     enabled: true
-
   elastic_ip:
     enabled: true
 
@@ -541,194 +318,291 @@ report:
     - csv
 ```
 
+The scanner aggregator reads the `audit` section and respects each scanner's `enabled` setting.
+
+The CLI's `--region` option takes precedence over automatic region discovery for that invocation.
+
 ---
 
-# ðŸ§ª Testing
+## Local Development with moto
 
-The project uses `pytest` for automated testing. AWS services are mocked using **moto**, both during automated tests and during day-to-day development (see Local Development above) â€” no real AWS account is used at any point in the build.
+The test suite uses `moto` to emulate AWS services locally.
+
+Install development dependencies:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+The repository's automated tests use `moto`'s `mock_aws` support, so most tests do not require a live AWS account.
+
+A standalone moto server can also be used when you want to exercise the CLI against an AWS-compatible local endpoint.
+
+For example:
+
+```bash
+pip install "moto[server]>=5.0"
+moto_server -p 5000
+```
+
+Then:
+
+```bash
+cloud-auditor --endpoint-url http://localhost:5000 whoami
+cloud-auditor --endpoint-url http://localhost:5000 regions
+```
+
+When a custom endpoint is supplied and no credentials are available, the project creates a session with test credentials so local emulation can run without real AWS secrets.
+
+---
+
+## Testing
+
+Run the test suite with:
 
 ```bash
 pytest
+```
+
+Verbose mode:
+
+```bash
 pytest -v
 ```
 
+The repository currently contains tests covering:
+
+- Region discovery
+- AWS identity verification
+- Configuration loading and defaults
+- EBS scanning
+- Elastic IP scanning
+- EC2/CloudWatch utilization scanning
+- Scanner aggregation and failure isolation
+- Audit command behavior
+- JSON reporting
+- CSV reporting
+- Audit integration with mocked AWS resources
+
+No real AWS resources are required for the automated test suite.
+
 ---
 
-# ðŸ“¦ Build Standalone Executable
+## Installation
+
+### 1. Clone the repository
 
 ```bash
-pip install pyinstaller
-pyinstaller --onefile cloud_auditor/cli.py
+git clone https://github.com/3000sagar/Cloud-Infrastructure-Auditor-Cost-Optimizer-CLI-.git
+cd Cloud-Infrastructure-Auditor-Cost-Optimizer-CLI-
 ```
 
-Output: `dist/cloud-auditor`
+### 2. Create a virtual environment
+
+Windows:
+
+```powershell
+python -m venv venv
+venv\Scripts\activate
+```
+
+Linux/macOS:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Install the CLI locally
+
+```bash
+pip install -e .
+```
+
+Verify:
+
+```bash
+cloud-auditor --help
+```
 
 ---
 
-# ðŸ“ˆ Example Audit Results
+## AWS Permissions
+
+For normal read-only auditing, the scanners and region discovery use AWS API calls corresponding to:
 
 ```text
-â•­â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â•®
-â”‚                   CLOUD INFRASTRUCTURE AUDIT                      â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚ Resource      â”‚ Region       â”‚ Finding    â”‚ Recommendation        â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚ vol-123456    â”‚ ap-south-1   â”‚ Unattached â”‚ Delete / Review       â”‚
-â”‚ eip-789012    â”‚ ap-south-1   â”‚ Unused     â”‚ Release               â”‚
-â”‚ i-abcdef123   â”‚ us-east-1    â”‚ <5% CPU    â”‚ Downsize / Terminate  â”‚
-â•°â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â•¯
-
-Potential Monthly Savings: $XX.XX
-
-Resources Audited: NN
-Issues Found:       N
-Optimization Score: NN%
+ec2:DescribeInstances
+ec2:DescribeVolumes
+ec2:DescribeAddresses
+ec2:DescribeRegions
+cloudwatch:GetMetricStatistics
+sts:GetCallerIdentity
 ```
 
-*(Illustrative target format â€” not actual output. Will be replaced with real results once the audit engine runs.)*
-
----
-
-# ðŸ—ºï¸ Development Roadmap
-
-## Phase 1 â€” AWS Foundation
-
-* [x] Project architecture
-* [x] Typer CLI
-* [x] AWS authentication
-* [x] AWS region discovery
-* [x] Retry/rate-limit handling
-
-## Phase 2 â€” Audit Engine
-
-* [x] Unattached EBS detection
-* [x] Unassociated Elastic IP detection
-* [x] EC2 utilization analysis
-* [x] CloudWatch integration
-* [ ] Multi-region scanning
-
-## Phase 3 â€” Reporting
-
-* [ ] Rich terminal reports
-* [x] JSON export
-* [x] CSV export
-* [ ] Cost-saving recommendations
-* [ ] Optimization scoring
-
-## Phase 4 â€” Cleanup
-
-* [ ] Dry-run mode
-* [ ] Confirmation workflow
-* [ ] Safe EBS cleanup
-* [ ] Safe Elastic IP cleanup
-* [ ] Cleanup audit logs
-
-## Phase 5 â€” Quality & Distribution
-
-* [ ] Unit/local-dev tests with moto
-* [ ] Integration tests
-* [ ] PyInstaller packaging
-* [ ] Documentation
-* [ ] CI/CD
-* [ ] PyPI/internal package distribution
-
----
-
-# ðŸ“… 4-Week Development Plan
-
-### Week 1 â€” CLI Architecture & Authentication
-
-* Build Typer command structure.
-* Implement AWS authentication.
-* Support AWS profiles.
-* Implement IAM role support.
-* Add region discovery.
-* Implement API retry and rate-limit handling.
-
-### Week 2 â€” Audit Scanners
-
-* Implement EBS scanner.
-* Implement Elastic IP scanner.
-* Implement EC2 scanner.
-* Integrate CloudWatch.
-* Detect low-utilization instances.
-* Aggregate audit results.
-
-### Week 3 â€” Reporting & Cleanup
-
-* Build Rich terminal reports.
-* Add JSON export.
-* Add CSV export.
-* Implement recommendations.
-* Implement dry-run functionality.
-* Implement safe cleanup execution.
-
-### Week 4 â€” Testing & Distribution
-
-* Add moto-based AWS tests.
-* Improve error handling.
-* Package using PyInstaller.
-* Prepare documentation.
-* Perform user acceptance testing.
-* Prepare release.
-
----
-
-# ðŸ”’ Security Considerations
-
-The application should:
-
-* Never store AWS secret keys in source code.
-* Use the AWS credential provider chain.
-* Support IAM roles.
-* Follow least-privilege IAM policies.
-* Require explicit confirmation for destructive operations.
-* Provide a dry-run mode.
-* Avoid logging sensitive credentials.
-* Validate resource IDs before cleanup.
-* Handle AWS API failures safely.
-
-Never commit:
+Cleanup permissions such as:
 
 ```text
-.env
-credentials
-access keys
-secret keys
-private keys
-AWS configuration containing secrets
+ec2:DeleteVolume
+ec2:ReleaseAddress
+```
+
+are **not required by the current implementation**, because destructive cleanup has not been implemented yet.
+
+Use least-privilege credentials and never commit AWS secrets to source control.
+
+---
+
+## Project Structure
+
+The repository currently looks like this:
+
+```text
+Cloud-Infrastructure-Auditor-Cost-Optimizer-CLI-/
+├── cloud_auditor/
+│   ├── __init__.py
+│   ├── cli.py
+│   ├── audit/
+│   │   └── orchestrator.py
+│   ├── auth/
+│   │   └── aws.py
+│   ├── scanners/
+│   │   ├── base.py
+│   │   ├── aggregator.py
+│   │   ├── ebs.py
+│   │   ├── ec2.py
+│   │   └── elastic_ip.py
+│   ├── analysis/
+│   │   ├── utilization.py
+│   │   └── recommendations.py
+│   ├── cleanup/
+│   │   └── executor.py
+│   ├── reporting/
+│   │   ├── json_report.py
+│   │   ├── csv_report.py
+│   │   └── rich_report.py
+│   └── utils/
+│       ├── config.py
+│       ├── regions.py
+│       └── retry.py
+├── config/
+│   └── config.yaml
+├── reports/
+│   └── .gitkeep
+├── tests/
+├── .gitignore
+├── LICENSE
+├── pyproject.toml
+├── requirements.txt
+└── requirements-dev.txt
 ```
 
 ---
 
-# âš ï¸ Disclaimer
+## Tech Stack
 
-This project is intended to assist with cloud infrastructure auditing and cost optimization.
+### Application
 
-**Do not blindly execute cleanup recommendations.**
+- Python 3.10+
+- Typer
+- Rich
+- Boto3
+- PyYAML
 
-Before deleting or modifying production resources:
+### Testing
 
-1. Review the audit report.
-2. Verify the resource is genuinely unused.
-3. Check dependencies.
-4. Run the cleanup in `--dry-run` mode.
-5. Confirm the target AWS account and region.
-6. Use appropriate IAM permissions.
-7. Maintain backups where necessary.
+- pytest
+- moto
 
-The authors are not responsible for infrastructure damage, service interruption, data loss, or unexpected cloud charges caused by incorrect configuration or execution.
+### Packaging
 
----
+- Setuptools
 
-# ðŸ“„ License
-
-This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
+PyInstaller is not currently part of the project's declared dependencies or build configuration.
 
 ---
 
-# ðŸ‘¨â€ðŸ’» Author
+## Roadmap
+
+### Phase 1 — AWS Foundation
+
+- [x] Project architecture
+- [x] Typer CLI
+- [x] AWS authentication
+- [x] AWS identity verification
+- [x] AWS region discovery
+- [x] Retry configuration
+
+### Phase 2 — Audit Engine
+
+- [x] Unattached EBS detection
+- [x] Unassociated Elastic IP detection
+- [x] EC2 utilization analysis
+- [x] CloudWatch integration
+- [x] Multi-region scanning
+
+### Phase 3 — Reporting and Analysis
+
+- [x] JSON export
+- [x] CSV export
+- [ ] Rich terminal report export
+- [ ] Cost-saving recommendations
+- [ ] Optimization scoring
+
+### Phase 4 — Cleanup
+
+- [ ] Dry-run mode
+- [ ] Explicit confirmation workflow
+- [ ] Safe EBS cleanup
+- [ ] Safe Elastic IP cleanup
+- [ ] Cleanup audit logs
+
+### Phase 5 — Distribution and CI
+
+- [x] Automated unit/integration-style tests with moto
+- [ ] Additional live-AWS integration tests
+- [ ] PyInstaller packaging
+- [ ] CI/CD
+- [ ] PyPI/internal package distribution
+
+---
+
+## Important Notes
+
+### No fake live-output claims
+
+Examples shown in this README are command examples or data shapes, not claims about a particular AWS account.
+
+Actual findings depend on the AWS account, selected regions, configured thresholds, and available CloudWatch datapoints at runtime.
+
+### Cost estimates
+
+The current implementation does **not** calculate AWS prices or estimated monthly savings. The cost-optimization logic described in earlier versions of this README is planned work, not a current feature.
+
+### CloudWatch window
+
+The current EC2 scanner queries a configurable number of days, with a default of 14 days. It calculates the average from the datapoints returned by CloudWatch. It does not guarantee that exactly 14 daily datapoints exist.
+
+### Safety
+
+The current `cleanup` command does not modify AWS resources. When destructive functionality is eventually added, production resources should only be modified after reviewing findings, verifying dependencies, checking the target account/region, and using appropriate IAM controls.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
+
+---
+
+## Author
 
 **Sagar**
 
-Built with Python, AWS, Boto3, Typer, and Rich.
+Built with Python, AWS, Boto3, Typer, Rich, PyYAML, pytest, and moto.
