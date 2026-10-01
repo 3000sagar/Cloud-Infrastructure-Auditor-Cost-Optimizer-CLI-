@@ -10,6 +10,7 @@ from rich.table import Table
 from cloud_auditor import __version__
 from cloud_auditor.audit.orchestrator import run_audit
 from cloud_auditor.auth.aws import AuthError, create_session, verify_credentials
+from cloud_auditor.reporting.csv_report import write_csv_report
 from cloud_auditor.reporting.json_report import write_json_report
 from cloud_auditor.scanners.base import ScannerError
 from cloud_auditor.utils.regions import RegionDiscoveryError, get_enabled_regions
@@ -176,7 +177,7 @@ SUPPORTED_FORMATS = ("json", "csv", "terminal")
 def report(
     ctx: typer.Context,
     fmt: str = typer.Option(
-        "json", "--format", "-f", help="Report format: json (csv and terminal are coming)."
+        "json", "--format", "-f", help="Report format: json, csv (terminal is coming)."
     ),
     output_dir: Path = typer.Option(
         Path("reports"), "--output-dir", help="Directory to write the report into."
@@ -188,12 +189,15 @@ def report(
             f"[red]Unknown format '{fmt}'. Choose from: {', '.join(SUPPORTED_FORMATS)}.[/red]"
         )
         raise typer.Exit(code=2)
-    if fmt != "json":
+    if fmt == "terminal":
         console.print(f"[yellow]'{fmt}' reports are not implemented yet.[/yellow]")
         raise typer.Exit(code=1)
 
     findings, scan_regions = _collect_findings(ctx)
-    path = write_json_report(findings, scan_regions, output_dir)
+    if fmt == "csv":
+        path = write_csv_report(findings, output_dir)
+    else:
+        path = write_json_report(findings, scan_regions, output_dir)
     console.print(f"Wrote {len(findings)} finding(s) to {path}")
 
 

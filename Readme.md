@@ -1,4 +1,4 @@
-# ☁️ Cloud Infrastructure Auditor & Cost Optimizer
+# â˜ï¸ Cloud Infrastructure Auditor & Cost Optimizer
 
 > **A professional-grade Python CLI for auditing AWS infrastructure, identifying waste and misconfigurations, estimating potential cost savings, and safely cleaning up unused cloud resources.**
 
@@ -10,15 +10,15 @@
 
 ---
 
-## 🚧 Project Status
+## ðŸš§ Project Status
 
-**Week 1 complete.** CLI scaffolding, AWS authentication, region discovery, and retry/rate-limit handling are implemented and tested (see Phase 1 in the Roadmap), plus a `whoami` command for checking which identity you're authenticated as. `audit`, `report`, and `cleanup` are registered commands that currently return "not yet implemented" — their real logic lands in Weeks 2-3. The Roadmap section is the source of truth for what's actually done.
+**Week 1 complete.** CLI scaffolding, AWS authentication, region discovery, and retry/rate-limit handling are implemented and tested (see Phase 1 in the Roadmap), plus a `whoami` command for checking which identity you're authenticated as. `audit`, `report`, and `cleanup` are registered commands that currently return "not yet implemented" â€” their real logic lands in Weeks 2-3. The Roadmap section is the source of truth for what's actually done.
 
 **Scope: AWS only.** GCP/Azure support is explicitly out of scope for this build.
 
 ---
 
-## 📌 Overview
+## ðŸ“Œ Overview
 
 **Cloud Infrastructure Auditor & Cost Optimizer** is a command-line tool designed for **DevOps, Cloud Engineering, and FinOps teams** to automatically inspect cloud infrastructure and identify resources that may be unnecessarily increasing operational costs.
 
@@ -26,7 +26,7 @@ The application connects securely to AWS, scans resources across regions, analyz
 
 It also provides **safe cleanup operations** using a `dry-run` mode and explicit confirmation before making destructive changes.
 
-### 🎯 Key Goals
+### ðŸŽ¯ Key Goals
 
 * Identify unused and orphaned cloud resources.
 * Detect underutilized infrastructure.
@@ -38,9 +38,9 @@ It also provides **safe cleanup operations** using a `dry-run` mode and explicit
 
 ---
 
-# 🚀 Features
+# ðŸš€ Features
 
-## 🔍 Infrastructure Auditing
+## ðŸ” Infrastructure Auditing
 
 The auditor scans AWS resources for common sources of cloud waste.
 
@@ -69,25 +69,25 @@ This helps identify instances that may be oversized or no longer required.
 
 ---
 
-# 💰 Cost Optimization
+# ðŸ’° Cost Optimization
 
 The tool converts audit findings into actionable cost-saving recommendations.
 
 Target report format:
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│                  COST OPTIMIZATION REPORT                    │
-├───────────────────────┬─────────────┬────────────────────────┤
-│ Resource              │ Issue       │ Recommendation         │
-├───────────────────────┼─────────────┼────────────────────────┤
-│ vol-0abc123           │ Unattached  │ Delete EBS volume      │
-│ eipalloc-xyz          │ Unused      │ Release Elastic IP     │
-│ i-0def456             │ <5% CPU     │ Review / downsize EC2  │
-└───────────────────────┴─────────────┴────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚                  COST OPTIMIZATION REPORT                    â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Resource              â”‚ Issue       â”‚ Recommendation         â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ vol-0abc123           â”‚ Unattached  â”‚ Delete EBS volume      â”‚
+â”‚ eipalloc-xyz          â”‚ Unused      â”‚ Release Elastic IP     â”‚
+â”‚ i-0def456             â”‚ <5% CPU     â”‚ Review / downsize EC2  â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
-*(Example format — not live output.)*
+*(Example format â€” not live output.)*
 
 The generated report can contain:
 
@@ -105,7 +105,7 @@ The generated report can contain:
 
 ---
 
-# 🛡️ Safe Cleanup
+# ðŸ›¡ï¸ Safe Cleanup
 
 Infrastructure cleanup can be dangerous.
 
@@ -149,71 +149,71 @@ The tool should never silently delete resources.
 
 ---
 
-# 🏗️ Architecture
+# ðŸ—ï¸ Architecture
 
 ```text
-                         ┌─────────────────────┐
-                         │       CLI User      │
-                         └──────────┬──────────┘
-                                    │
-                                    ▼
-                         ┌─────────────────────┐
-                         │    Typer CLI Layer  │
-                         └──────────┬──────────┘
-                                    │
-                    ┌───────────────┼───────────────┐
-                    │               │               │
-                    ▼               ▼               ▼
+                         â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+                         â”‚       CLI User      â”‚
+                         â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                                    â”‚
+                                    â–¼
+                         â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+                         â”‚    Typer CLI Layer  â”‚
+                         â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                                    â”‚
+                    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+                    â”‚               â”‚               â”‚
+                    â–¼               â–¼               â–¼
               Authentication    Audit Engine     Reporting
-                    │               │               │
-                    ▼               ▼               ▼
+                    â”‚               â”‚               â”‚
+                    â–¼               â–¼               â–¼
                AWS Profiles      EC2 Scanner      Rich Tables
                IAM Roles         EBS Scanner      JSON
                                  EIP Scanner      CSV
-                                      │
-                                      ▼
-                              ┌───────────────┐
-                              │  CloudWatch   │
-                              │    Metrics    │
-                              └───────┬───────┘
-                                      │
-                                      ▼
-                              ┌───────────────┐
-                              │ Recommendations│
-                              └───────┬───────┘
-                                      │
-                             ┌────────┴────────┐
-                             ▼                 ▼
+                                      â”‚
+                                      â–¼
+                              â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+                              â”‚  CloudWatch   â”‚
+                              â”‚    Metrics    â”‚
+                              â””â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”˜
+                                      â”‚
+                                      â–¼
+                              â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+                              â”‚ Recommendationsâ”‚
+                              â””â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”˜
+                                      â”‚
+                             â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”
+                             â–¼                 â–¼
                          Dry Run            Execute
-                             │                 │
-                             ▼                 ▼
+                             â”‚                 â”‚
+                             â–¼                 â–¼
                          Preview         AWS Resources
 ```
 
 ---
 
-# 🧰 Tech Stack
+# ðŸ§° Tech Stack
 
 ### Core
 
 * **Python 3.10+**
-* **Typer** — CLI framework
-* **Rich** — terminal UI and formatting
+* **Typer** â€” CLI framework
+* **Rich** â€” terminal UI and formatting
 
 ### Cloud
 
-* **Boto3** — AWS SDK
+* **Boto3** â€” AWS SDK
 
 ### Data
 
-* **PyYAML** — configuration
-* **JSON** — report serialization
-* **CSV** — management reports
+* **PyYAML** â€” configuration
+* **JSON** â€” report serialization
+* **CSV** â€” management reports
 
 ### Testing
 
 * **pytest**
-* **moto** — full local AWS emulation for both development and automated testing
+* **moto** â€” full local AWS emulation for both development and automated testing
 
 ### Packaging
 
@@ -222,70 +222,70 @@ The tool should never silently delete resources.
 
 ---
 
-# 📁 Project Structure
+# ðŸ“ Project Structure
 
 ```text
 cloud-infrastructure-auditor/
-│
-├── cloud_auditor/
-│   ├── __init__.py
-│   ├── cli.py
-│   │
-│   ├── auth/
-│   │   ├── __init__.py
-│   │   └── aws.py
-│   │
-│   ├── scanners/
-│   │   ├── __init__.py
-│   │   ├── ec2.py
-│   │   ├── ebs.py
-│   │   ├── elastic_ip.py
-│   │   └── base.py
-│   │
-│   ├── analysis/
-│   │   ├── __init__.py
-│   │   ├── utilization.py
-│   │   └── recommendations.py
-│   │
-│   ├── cleanup/
-│   │   ├── __init__.py
-│   │   └── executor.py
-│   │
-│   ├── reporting/
-│   │   ├── __init__.py
-│   │   ├── rich_report.py
-│   │   ├── json_report.py
-│   │   └── csv_report.py
-│   │
-│   └── utils/
-│       ├── __init__.py
-│       ├── regions.py
-│       └── retry.py
-│
-├── tests/
-│   ├── test_ec2.py
-│   ├── test_ebs.py
-│   ├── test_elastic_ip.py
-│   └── test_cleanup.py
-│
-├── config/
-│   └── config.yaml
-│
-├── reports/
-│
-├── .gitignore
-├── requirements.txt
-├── setup.py
-├── pyproject.toml
-├── LICENSE
-└── README.md
+â”‚
+â”œâ”€â”€ cloud_auditor/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ cli.py
+â”‚   â”‚
+â”‚   â”œâ”€â”€ auth/
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â””â”€â”€ aws.py
+â”‚   â”‚
+â”‚   â”œâ”€â”€ scanners/
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ ec2.py
+â”‚   â”‚   â”œâ”€â”€ ebs.py
+â”‚   â”‚   â”œâ”€â”€ elastic_ip.py
+â”‚   â”‚   â””â”€â”€ base.py
+â”‚   â”‚
+â”‚   â”œâ”€â”€ analysis/
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ utilization.py
+â”‚   â”‚   â””â”€â”€ recommendations.py
+â”‚   â”‚
+â”‚   â”œâ”€â”€ cleanup/
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â””â”€â”€ executor.py
+â”‚   â”‚
+â”‚   â”œâ”€â”€ reporting/
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ rich_report.py
+â”‚   â”‚   â”œâ”€â”€ json_report.py
+â”‚   â”‚   â””â”€â”€ csv_report.py
+â”‚   â”‚
+â”‚   â””â”€â”€ utils/
+â”‚       â”œâ”€â”€ __init__.py
+â”‚       â”œâ”€â”€ regions.py
+â”‚       â””â”€â”€ retry.py
+â”‚
+â”œâ”€â”€ tests/
+â”‚   â”œâ”€â”€ test_ec2.py
+â”‚   â”œâ”€â”€ test_ebs.py
+â”‚   â”œâ”€â”€ test_elastic_ip.py
+â”‚   â””â”€â”€ test_cleanup.py
+â”‚
+â”œâ”€â”€ config/
+â”‚   â””â”€â”€ config.yaml
+â”‚
+â”œâ”€â”€ reports/
+â”‚
+â”œâ”€â”€ .gitignore
+â”œâ”€â”€ requirements.txt
+â”œâ”€â”€ setup.py
+â”œâ”€â”€ pyproject.toml
+â”œâ”€â”€ LICENSE
+â””â”€â”€ README.md
 ```
 
 > The structure may evolve as the project develops.
 
 ---
 
-# ⚙️ Installation
+# âš™ï¸ Installation
 
 ## 1. Clone the repository
 
@@ -333,31 +333,31 @@ cloud-auditor --help
 
 ---
 
-# 🔐 AWS Authentication
+# ðŸ” AWS Authentication
 
 The application uses standard AWS authentication mechanisms provided by **Boto3**. It does **not** require hardcoding AWS credentials inside the application.
 
-### Option 1 — AWS CLI Profile
+### Option 1 â€” AWS CLI Profile
 
 ```bash
 aws configure
 cloud-auditor audit --profile default
 ```
 
-### Option 2 — Named AWS Profile
+### Option 2 â€” Named AWS Profile
 
 ```bash
 aws configure --profile production
 cloud-auditor audit --profile production
 ```
 
-### Option 3 — IAM Role
+### Option 3 â€” IAM Role
 
 When running on AWS infrastructure such as EC2, the application can use the attached IAM role through the standard AWS credential provider chain.
 
 ---
 
-# 🔑 Required IAM Permissions
+# ðŸ”‘ Required IAM Permissions
 
 The auditor follows the **principle of least privilege**.
 
@@ -386,7 +386,7 @@ Never commit AWS credentials, access keys, secret keys, or `.env` files to GitHu
 
 ---
 
-# 🧪 Local Development (No Live AWS Account Required)
+# ðŸ§ª Local Development (No Live AWS Account Required)
 
 This project is developed and tested against a local AWS emulation layer using **moto**, not a live AWS account. This removes cost risk entirely during development and lets the 14-day CloudWatch utilization window be simulated instantly instead of waiting on real time.
 
@@ -408,17 +408,17 @@ cloud-auditor --endpoint-url http://localhost:5000 regions
 
 ### Seed test resources
 
-Unattached EBS volumes, unassociated Elastic IPs, and EC2 instances are created directly against the mock server via boto3 — no real infrastructure is provisioned, no cost incurred.
+Unattached EBS volumes, unassociated Elastic IPs, and EC2 instances are created directly against the mock server via boto3 â€” no real infrastructure is provisioned, no cost incurred.
 
 ### Simulate 14 days of CloudWatch history
 
 A real EC2 instance needs 14 real days of metrics before the utilization scanner has anything to detect. Locally, this is simulated by inserting `put_metric_data` datapoints with backdated timestamps, producing a realistic 14-day low-CPU history in a single call.
 
-> A live AWS pass may still be needed before final submission if the internship's evaluation criteria require proof of a real deployment — this has not yet been confirmed.
+> A live AWS pass may still be needed before final submission if the internship's evaluation criteria require proof of a real deployment â€” this has not yet been confirmed.
 
 ---
 
-# 🖥️ CLI Usage
+# ðŸ–¥ï¸ CLI Usage
 
 ```bash
 cloud-auditor --help
@@ -443,7 +443,7 @@ Commands:
   cleanup     Preview or execute cleanup operations
 ```
 
-## 🙋 Check Your Identity
+## ðŸ™‹ Check Your Identity
 
 ```bash
 cloud-auditor whoami
@@ -452,7 +452,7 @@ cloud-auditor --profile production whoami
 
 Useful as a sanity check before running an audit against the wrong account.
 
-## 🔎 Run an Audit
+## ðŸ”Ž Run an Audit
 
 ```bash
 cloud-auditor audit
@@ -463,7 +463,7 @@ cloud-auditor audit --regions ap-south-1,us-east-1,eu-west-1
 
 ---
 
-# 📊 Generate Reports
+# ðŸ“Š Generate Reports
 
 ### JSON
 
@@ -487,19 +487,19 @@ Rich terminal tables provide an easy-to-read overview of detected issues.
 
 ---
 
-# 🧹 Cleanup Workflow
+# ðŸ§¹ Cleanup Workflow
 
 ```text
 AUDIT
-  ↓
+  â†“
 REVIEW FINDINGS
-  ↓
+  â†“
 GENERATE REPORT
-  ↓
+  â†“
 DRY RUN
-  ↓
+  â†“
 USER CONFIRMATION
-  ↓
+  â†“
 EXECUTE
 ```
 
@@ -512,7 +512,7 @@ The application should request explicit confirmation before destructive operatio
 
 ---
 
-# ⚙️ Configuration
+# âš™ï¸ Configuration
 
 ```yaml
 aws:
@@ -543,9 +543,9 @@ report:
 
 ---
 
-# 🧪 Testing
+# ðŸ§ª Testing
 
-The project uses `pytest` for automated testing. AWS services are mocked using **moto**, both during automated tests and during day-to-day development (see Local Development above) — no real AWS account is used at any point in the build.
+The project uses `pytest` for automated testing. AWS services are mocked using **moto**, both during automated tests and during day-to-day development (see Local Development above) â€” no real AWS account is used at any point in the build.
 
 ```bash
 pytest
@@ -554,7 +554,7 @@ pytest -v
 
 ---
 
-# 📦 Build Standalone Executable
+# ðŸ“¦ Build Standalone Executable
 
 ```bash
 pip install pyinstaller
@@ -565,18 +565,18 @@ Output: `dist/cloud-auditor`
 
 ---
 
-# 📈 Example Audit Results
+# ðŸ“ˆ Example Audit Results
 
 ```text
-╭────────────────────────────────────────────────────────────────────╮
-│                   CLOUD INFRASTRUCTURE AUDIT                      │
-├───────────────┬──────────────┬────────────┬───────────────────────┤
-│ Resource      │ Region       │ Finding    │ Recommendation        │
-├───────────────┼──────────────┼────────────┼───────────────────────┤
-│ vol-123456    │ ap-south-1   │ Unattached │ Delete / Review       │
-│ eip-789012    │ ap-south-1   │ Unused     │ Release               │
-│ i-abcdef123   │ us-east-1    │ <5% CPU    │ Downsize / Terminate  │
-╰───────────────┴──────────────┴────────────┴───────────────────────╯
+â•­â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â•®
+â”‚                   CLOUD INFRASTRUCTURE AUDIT                      â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Resource      â”‚ Region       â”‚ Finding    â”‚ Recommendation        â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ vol-123456    â”‚ ap-south-1   â”‚ Unattached â”‚ Delete / Review       â”‚
+â”‚ eip-789012    â”‚ ap-south-1   â”‚ Unused     â”‚ Release               â”‚
+â”‚ i-abcdef123   â”‚ us-east-1    â”‚ <5% CPU    â”‚ Downsize / Terminate  â”‚
+â•°â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â•¯
 
 Potential Monthly Savings: $XX.XX
 
@@ -585,13 +585,13 @@ Issues Found:       N
 Optimization Score: NN%
 ```
 
-*(Illustrative target format — not actual output. Will be replaced with real results once the audit engine runs.)*
+*(Illustrative target format â€” not actual output. Will be replaced with real results once the audit engine runs.)*
 
 ---
 
-# 🗺️ Development Roadmap
+# ðŸ—ºï¸ Development Roadmap
 
-## Phase 1 — AWS Foundation
+## Phase 1 â€” AWS Foundation
 
 * [x] Project architecture
 * [x] Typer CLI
@@ -599,7 +599,7 @@ Optimization Score: NN%
 * [x] AWS region discovery
 * [x] Retry/rate-limit handling
 
-## Phase 2 — Audit Engine
+## Phase 2 â€” Audit Engine
 
 * [x] Unattached EBS detection
 * [x] Unassociated Elastic IP detection
@@ -607,15 +607,15 @@ Optimization Score: NN%
 * [x] CloudWatch integration
 * [ ] Multi-region scanning
 
-## Phase 3 — Reporting
+## Phase 3 â€” Reporting
 
 * [ ] Rich terminal reports
 * [x] JSON export
-* [ ] CSV export
+* [x] CSV export
 * [ ] Cost-saving recommendations
 * [ ] Optimization scoring
 
-## Phase 4 — Cleanup
+## Phase 4 â€” Cleanup
 
 * [ ] Dry-run mode
 * [ ] Confirmation workflow
@@ -623,7 +623,7 @@ Optimization Score: NN%
 * [ ] Safe Elastic IP cleanup
 * [ ] Cleanup audit logs
 
-## Phase 5 — Quality & Distribution
+## Phase 5 â€” Quality & Distribution
 
 * [ ] Unit/local-dev tests with moto
 * [ ] Integration tests
@@ -634,9 +634,9 @@ Optimization Score: NN%
 
 ---
 
-# 📅 4-Week Development Plan
+# ðŸ“… 4-Week Development Plan
 
-### Week 1 — CLI Architecture & Authentication
+### Week 1 â€” CLI Architecture & Authentication
 
 * Build Typer command structure.
 * Implement AWS authentication.
@@ -645,7 +645,7 @@ Optimization Score: NN%
 * Add region discovery.
 * Implement API retry and rate-limit handling.
 
-### Week 2 — Audit Scanners
+### Week 2 â€” Audit Scanners
 
 * Implement EBS scanner.
 * Implement Elastic IP scanner.
@@ -654,7 +654,7 @@ Optimization Score: NN%
 * Detect low-utilization instances.
 * Aggregate audit results.
 
-### Week 3 — Reporting & Cleanup
+### Week 3 â€” Reporting & Cleanup
 
 * Build Rich terminal reports.
 * Add JSON export.
@@ -663,7 +663,7 @@ Optimization Score: NN%
 * Implement dry-run functionality.
 * Implement safe cleanup execution.
 
-### Week 4 — Testing & Distribution
+### Week 4 â€” Testing & Distribution
 
 * Add moto-based AWS tests.
 * Improve error handling.
@@ -674,7 +674,7 @@ Optimization Score: NN%
 
 ---
 
-# 🔒 Security Considerations
+# ðŸ”’ Security Considerations
 
 The application should:
 
@@ -701,7 +701,7 @@ AWS configuration containing secrets
 
 ---
 
-# ⚠️ Disclaimer
+# âš ï¸ Disclaimer
 
 This project is intended to assist with cloud infrastructure auditing and cost optimization.
 
@@ -721,13 +721,13 @@ The authors are not responsible for infrastructure damage, service interruption,
 
 ---
 
-# 📄 License
+# ðŸ“„ License
 
 This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-# 👨‍💻 Author
+# ðŸ‘¨â€ðŸ’» Author
 
 **Sagar**
 

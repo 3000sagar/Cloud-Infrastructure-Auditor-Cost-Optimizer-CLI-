@@ -85,11 +85,6 @@ def test_report_command_rejects_unknown_format():
     assert "Unknown format" in result.stdout
 
 
-def test_report_command_csv_is_not_implemented_yet():
-    result = runner.invoke(app, ["report", "--format", "csv"])
-    assert result.exit_code == 1
-    assert "not implemented yet" in result.stdout
-
 
 @mock_aws
 def test_report_without_region_scans_every_enabled_region(tmp_path):
