@@ -1,4 +1,4 @@
-"""cloud-auditor command-line interface."""
+﻿"""cloud-auditor command-line interface."""
 
 from pathlib import Path
 from typing import Optional
@@ -155,19 +155,29 @@ def audit(ctx: typer.Context) -> None:
     table.add_column("Region")
     table.add_column("Issue")
     table.add_column("Recommendation")
+    table.add_column("Est. $/mo", no_wrap=True)
+    table.add_column("Risk", no_wrap=True)
 
     for finding in findings:
+        savings = (
+            f"${finding.estimated_monthly_savings:.2f}"
+            if finding.estimated_monthly_savings is not None
+            else "-"
+        )
         table.add_row(
             finding.resource_id,
             finding.resource_type,
             finding.region,
             finding.issue,
             finding.recommendation,
+            savings,
+            finding.risk_level,
         )
 
     # Fixed width regardless of the detected terminal size, so IDs stay
     # intact under a narrow terminal or a test runner with a small default.
-    Console(width=120).print(table)
+    # Widened from 120 to fit the two new columns without squeezing the ID.
+    Console(width=150).print(table)
 
 
 SUPPORTED_FORMATS = ("json", "csv", "terminal")
