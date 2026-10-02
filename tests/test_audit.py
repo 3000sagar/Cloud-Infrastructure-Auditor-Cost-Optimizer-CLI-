@@ -48,8 +48,10 @@ def test_run_audit_combines_findings_from_all_scanners():
             regions=["ap-south-1"],
         )
 
-    assert findings == [
-        ebs_finding,
-        eip_finding,
-        ec2_finding,
-    ]
+    # Exact equality isn't used here: the aggregator enriches findings
+    # with cost/risk estimates (see test_recommendations.py), so the
+    # returned objects legitimately differ from what the scanners
+    # returned. What this test actually verifies is that all three
+    # scanners' findings made it into the combined result.
+    ids = {f.resource_id for f in findings}
+    assert ids == {"vol-123", "eipalloc-123", "i-123"}

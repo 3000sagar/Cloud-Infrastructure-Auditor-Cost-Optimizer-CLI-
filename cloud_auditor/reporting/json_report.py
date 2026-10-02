@@ -22,6 +22,9 @@ def build_report(findings: List[Finding], regions: List[str]) -> dict:
         "summary": {
             "total_findings": len(findings),
             "by_type": dict(Counter(f.resource_type for f in findings)),
+            "estimated_total_monthly_savings": round(
+                sum(f.estimated_monthly_savings or 0 for f in findings), 2
+            ),
         },
         "findings": [asdict(f) for f in findings],
     }

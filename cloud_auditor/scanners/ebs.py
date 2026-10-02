@@ -34,6 +34,7 @@ def scan_unattached_volumes(
             region=region,
             issue="Unattached",
             recommendation="Delete, or snapshot then delete, if genuinely unused",
+            metadata={"size_gb": volume["Size"]},
         )
         for volume in response["Volumes"]
     ]

@@ -84,6 +84,7 @@ def scan_underutilized_instances(
                             f"(< {cpu_threshold}% threshold)"
                         ),
                         recommendation="Review for downsizing or termination",
+                        metadata={"instance_type": instance["InstanceType"]},
                     )
                 )
     return findings

@@ -9,6 +9,7 @@ from cloud_auditor.scanners.ebs import scan_unattached_volumes
 from cloud_auditor.scanners.ec2 import scan_underutilized_instances
 from cloud_auditor.scanners.elastic_ip import scan_unassociated_addresses
 from cloud_auditor.utils.config import load_audit_config
+from cloud_auditor.analysis.recommendations import enrich_with_savings_estimates
 
 
 def run_all_scanners(
@@ -65,4 +66,4 @@ def run_all_scanners(
                 )
             )
 
-    return findings
+    return enrich_with_savings_estimates(findings)
