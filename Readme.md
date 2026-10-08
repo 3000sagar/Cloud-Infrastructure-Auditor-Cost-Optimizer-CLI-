@@ -590,7 +590,7 @@ Output would land in `dist/cloud-auditor`.
 
 ## Phase 3 — Reporting
 
-* [ ] Rich terminal report file (`report --format terminal`)
+* [x] Rich terminal report file (`report --format terminal`)
 * [x] JSON export
 * [x] CSV export
 * [x] Cost-saving recommendations

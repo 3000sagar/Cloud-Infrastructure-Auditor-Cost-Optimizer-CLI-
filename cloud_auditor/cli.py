@@ -12,6 +12,7 @@ from cloud_auditor.audit.orchestrator import run_audit
 from cloud_auditor.auth.aws import AuthError, create_session, verify_credentials
 from cloud_auditor.reporting.csv_report import write_csv_report
 from cloud_auditor.reporting.json_report import write_json_report
+from cloud_auditor.reporting.rich_report import render_terminal_report
 from cloud_auditor.scanners.base import ScannerError
 from cloud_auditor.utils.regions import RegionDiscoveryError, get_enabled_regions
 
@@ -141,43 +142,7 @@ def _collect_findings(ctx: typer.Context):
 def audit(ctx: typer.Context) -> None:
     """Scan for idle EC2, unattached EBS and unassociated Elastic IPs."""
     findings, _scan_regions = _collect_findings(ctx)
-
-    if not findings:
-        console.print("[green]No audit findings detected.[/green]")
-        return
-
-    table = Table(title=f"Audit findings ({len(findings)})")
-    # AWS resource IDs run up to ~30 chars. no_wrap here + a wide enough
-    # Console below means an ID is never split across lines or truncated --
-    # a user has to be able to copy the exact ID off this table to act on it.
-    table.add_column("Resource ID", no_wrap=True)
-    table.add_column("Type")
-    table.add_column("Region")
-    table.add_column("Issue")
-    table.add_column("Recommendation")
-    table.add_column("Est. $/mo", no_wrap=True)
-    table.add_column("Risk", no_wrap=True)
-
-    for finding in findings:
-        savings = (
-            f"${finding.estimated_monthly_savings:.2f}"
-            if finding.estimated_monthly_savings is not None
-            else "-"
-        )
-        table.add_row(
-            finding.resource_id,
-            finding.resource_type,
-            finding.region,
-            finding.issue,
-            finding.recommendation,
-            savings,
-            finding.risk_level,
-        )
-
-    # Fixed width regardless of the detected terminal size, so IDs stay
-    # intact under a narrow terminal or a test runner with a small default.
-    # Widened from 120 to fit the two new columns without squeezing the ID.
-    Console(width=150).print(table)
+    render_terminal_report(findings)
 
 
 SUPPORTED_FORMATS = ("json", "csv", "terminal")
@@ -187,23 +152,26 @@ SUPPORTED_FORMATS = ("json", "csv", "terminal")
 def report(
     ctx: typer.Context,
     fmt: str = typer.Option(
-        "json", "--format", "-f", help="Report format: json, csv (terminal is coming)."
+        "json", "--format", "-f", help="Report format: json, csv, or terminal."
     ),
     output_dir: Path = typer.Option(
-        Path("reports"), "--output-dir", help="Directory to write the report into."
+        Path("reports"),
+        "--output-dir",
+        help="Directory to write the report into (ignored for terminal).",
     ),
 ) -> None:
-    """Run an audit and export the results to a file."""
+    """Run an audit and show or export the results."""
     if fmt not in SUPPORTED_FORMATS:
         console.print(
             f"[red]Unknown format '{fmt}'. Choose from: {', '.join(SUPPORTED_FORMATS)}.[/red]"
         )
         raise typer.Exit(code=2)
-    if fmt == "terminal":
-        console.print(f"[yellow]'{fmt}' reports are not implemented yet.[/yellow]")
-        raise typer.Exit(code=1)
 
     findings, scan_regions = _collect_findings(ctx)
+
+    if fmt == "terminal":
+        render_terminal_report(findings)
+        return
     if fmt == "csv":
         path = write_csv_report(findings, output_dir)
     else:
