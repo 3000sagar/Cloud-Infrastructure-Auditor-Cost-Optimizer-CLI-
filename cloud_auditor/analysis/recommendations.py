@@ -45,6 +45,14 @@ RISK_LEVELS = {
     "EC2 Instance": "Medium",
 }
 
+# Points subtracted from a clean 100 for each finding at this risk
+# level, used by calculate_optimization_score. An unrecognized risk
+# level (shouldn't happen given RISK_LEVELS above, but defensively
+# possible) is treated as conservatively as High -- an unclassified
+# risk is not assumed to be a safe one.
+RISK_WEIGHTS = {"High": 5, "Medium": 2, "Low": 1}
+DEFAULT_RISK_WEIGHT = 5
+
 
 def _estimate_savings(finding: Finding) -> Optional[float]:
     if finding.resource_type == "EBS Volume":
@@ -85,3 +93,24 @@ def enrich_with_savings_estimates(findings: List[Finding]) -> List[Finding]:
             )
         )
     return enriched
+
+
+def calculate_optimization_score(findings: List[Finding]) -> int:
+    """A 0-100 score reflecting how much unaddressed risk is sitting in
+    the account, based on the findings' risk levels.
+
+    This is NOT a percentage of wasted spend -- the tool has no access
+    to actual AWS billing data, so no such percentage can be honestly
+    computed. 100 means a clean scan; every finding subtracts points,
+    weighted by how risky it is to leave unaddressed (see RISK_WEIGHTS).
+    The score floors at 0, never negative.
+
+    Scanner-failure findings (resource_type ending in " Scanner") are
+    excluded -- a scan error isn't an optimization problem to score.
+    """
+    penalty = 0
+    for finding in findings:
+        if finding.resource_type.endswith(" Scanner"):
+            continue
+        penalty += RISK_WEIGHTS.get(finding.risk_level, DEFAULT_RISK_WEIGHT)
+    return max(0, 100 - penalty)

@@ -5,6 +5,7 @@ from typing import Iterable, Optional
 from rich.console import Console
 from rich.table import Table
 
+from cloud_auditor.analysis.recommendations import calculate_optimization_score
 from cloud_auditor.scanners.base import Finding
 
 # Fixed width regardless of the detected terminal size, so AWS resource IDs
@@ -47,16 +48,20 @@ def build_findings_table(findings: Iterable[Finding]) -> Table:
 def render_terminal_report(
     findings: Iterable[Finding], console: Optional[Console] = None
 ) -> None:
-    """Print findings as a Rich table, or a clean message when there are none.
+    """Print findings as a Rich table plus an optimization score, or a
+    clean message when there are none.
 
     Pass an explicit `console` (e.g. one bound to a StringIO) in tests to
     capture output without depending on a real terminal.
     """
     findings = list(findings)
     out = console or Console(width=TABLE_CONSOLE_WIDTH)
+    score = calculate_optimization_score(findings)
 
     if not findings:
         out.print("[green]No audit findings detected.[/green]")
+        out.print(f"[bold]Optimization score: {score}/100[/bold]")
         return
 
     out.print(build_findings_table(findings))
+    out.print(f"[bold]Optimization score: {score}/100[/bold]")

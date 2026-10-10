@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
+from cloud_auditor.analysis.recommendations import calculate_optimization_score
 from cloud_auditor.scanners.base import Finding
 
 REPORT_FILENAME = "audit-report.json"
@@ -25,6 +26,7 @@ def build_report(findings: List[Finding], regions: List[str]) -> dict:
             "estimated_total_monthly_savings": round(
                 sum(f.estimated_monthly_savings or 0 for f in findings), 2
             ),
+            "optimization_score": calculate_optimization_score(findings),
         },
         "findings": [asdict(f) for f in findings],
     }
