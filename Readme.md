@@ -26,13 +26,14 @@ The current `main` branch contains a working AWS audit pipeline for:
 - CSV report export
 - Rich terminal report export (`report --format terminal`)
 - Optimization score (0-100, based on finding risk levels)
+- EBS/Elastic IP cleanup with dry-run and explicit confirmation (`cleanup` / `cleanup --execute`)
 - Retry/backoff configuration
 - Automated tests using `pytest` and `moto`
 
 The following parts are currently **not implemented**:
 
-- Destructive cleanup execution
-- Dry-run/confirmation cleanup workflow
+- EC2 cleanup (stop/resize) -- intentionally out of scope, see the Cleanup section
+- Cleanup audit logs
 - PyInstaller distribution workflow
 - CI/CD pipeline
 - PyPI/internal package distribution
@@ -270,33 +271,31 @@ No file is written, and `--output-dir` is ignored for this format. The table inc
 
 ---
 
-## Cleanup Status
+## Cleanup
 
-Cleanup code is currently a stub.
+`cloud-auditor cleanup` finds unattached EBS volumes and unassociated Elastic IPs and can delete them -- the only two resource types it will ever act on.
 
-The repository does **not** currently delete AWS resources, and the CLI command:
+### What it does NOT do
+
+EC2 instances are never touched by this command, under any flag. Stopping or resizing a running instance carries more operational risk than deleting an orphaned volume or releasing an idle IP -- an instance flagged as low-CPU may still be serving traffic. Automated EC2 remediation is not implemented.
+
+There is also no cleanup audit log yet -- a persisted record of what was deleted and when is still on the roadmap.
+
+### Dry run (default)
 
 ```bash
 cloud-auditor cleanup
 ```
 
-reports that cleanup is not implemented.
+Scans, shows exactly which EBS volumes and Elastic IPs would be deleted, and deletes nothing. Any EC2 findings in the same scan are noted as not eligible for automated cleanup, not silently dropped.
 
-The intended future workflow is:
+### Execute
 
-```text
-AUDIT
-  ↓
-REVIEW FINDINGS
-  ↓
-DRY RUN
-  ↓
-USER CONFIRMATION
-  ↓
-EXECUTE
+```bash
+cloud-auditor cleanup --execute
 ```
 
-Do not treat the cleanup examples from older documentation as available functionality on the current `main` branch.
+Runs the same dry-run preview, then asks for an explicit `y`/`N` confirmation before deleting anything. Only a literal `y` proceeds; anything else aborts with nothing deleted. Deletion happens resource-by-resource -- if one fails (e.g. it was already deleted elsewhere), the error is reported and the rest still proceed.
 
 ---
 
@@ -458,14 +457,14 @@ cloudwatch:GetMetricStatistics
 sts:GetCallerIdentity
 ```
 
-Cleanup permissions such as:
+Cleanup permissions:
 
 ```text
 ec2:DeleteVolume
 ec2:ReleaseAddress
 ```
 
-are **not required by the current implementation**, because destructive cleanup has not been implemented yet.
+are required only if you run `cleanup --execute`. The default `cleanup` dry run, and every other command, only needs the read-only permissions listed above.
 
 Use least-privilege credentials and never commit AWS secrets to source control.
 
@@ -569,10 +568,10 @@ PyInstaller is not currently part of the project's declared dependencies or buil
 
 ### Phase 4 — Cleanup
 
-- [ ] Dry-run mode
-- [ ] Explicit confirmation workflow
-- [ ] Safe EBS cleanup
-- [ ] Safe Elastic IP cleanup
+- [x] Dry-run mode
+- [x] Explicit confirmation workflow
+- [x] Safe EBS cleanup
+- [x] Safe Elastic IP cleanup
 - [ ] Cleanup audit logs
 
 ### Phase 5 — Distribution and CI
@@ -601,13 +600,17 @@ Estimated monthly savings are flat-rate approximations (a fixed EBS $/GB rate, a
 
 The 0-100 optimization score is NOT a percentage of wasted spend -- the tool has no access to actual AWS billing data, so no such percentage can be honestly computed. It's a penalty-based score: 100 means a clean scan, and each finding subtracts points weighted by its risk level (High: -5, Medium: -2, Low: -1), floored at 0. It's a relative measure of how much unaddressed risk is sitting in the account, not a dollar or percentage figure.
 
+### Cleanup safety
+
+`cleanup --execute` permanently deletes AWS resources after an explicit confirmation prompt -- there is no undo. It only ever acts on EBS volumes and Elastic IPs; EC2 instances are never deleted, stopped, or resized by this tool. Verify the dry-run output carefully before confirming.
+
 ### CloudWatch window
 
 The current EC2 scanner queries a configurable number of days, with a default of 14 days. It calculates the average from the datapoints returned by CloudWatch. It does not guarantee that exactly 14 daily datapoints exist.
 
 ### Safety
 
-The current `cleanup` command does not modify AWS resources. When destructive functionality is eventually added, production resources should only be modified after reviewing findings, verifying dependencies, checking the target account/region, and using appropriate IAM controls.
+`cleanup --execute` can modify AWS resources -- see the Cleanup section and the Cleanup safety note above. Production resources should only be deleted after reviewing the dry-run findings, verifying nothing still depends on them, confirming the target account/region, and using least-privilege IAM credentials.
 
 ---
 

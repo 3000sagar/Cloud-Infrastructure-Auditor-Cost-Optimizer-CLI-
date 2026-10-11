@@ -10,9 +10,10 @@ from rich.table import Table
 from cloud_auditor import __version__
 from cloud_auditor.audit.orchestrator import run_audit
 from cloud_auditor.auth.aws import AuthError, create_session, verify_credentials
+from cloud_auditor.cleanup.executor import execute_cleanup, plan_cleanup
 from cloud_auditor.reporting.csv_report import write_csv_report
 from cloud_auditor.reporting.json_report import write_json_report
-from cloud_auditor.reporting.rich_report import render_terminal_report
+from cloud_auditor.reporting.rich_report import build_findings_table, render_terminal_report
 from cloud_auditor.scanners.base import ScannerError
 from cloud_auditor.utils.regions import RegionDiscoveryError, get_enabled_regions
 
@@ -97,14 +98,6 @@ def regions(ctx: typer.Context) -> None:
     console.print(table)
 
 
-def _not_implemented(feature: str, week: int) -> None:
-    console.print(
-        f"[yellow]{feature} is not implemented yet "
-        f"(planned for Week {week}).[/yellow]"
-    )
-    raise typer.Exit(code=1)
-
-
 def _collect_findings(ctx: typer.Context):
     """Authenticate, choose the regions to scan, run the audit.
 
@@ -180,9 +173,80 @@ def report(
 
 
 @app.command()
-def cleanup(ctx: typer.Context) -> None:
-    """Dry-run or execute cleanup of flagged resources."""
-    _not_implemented("cleanup", 3)
+def cleanup(
+    ctx: typer.Context,
+    execute: bool = typer.Option(
+        False,
+        "--execute",
+        help=(
+            "Actually delete the listed resources after an explicit "
+            "y/N confirmation. Without this flag, cleanup always runs "
+            "as a dry run and deletes nothing."
+        ),
+    ),
+) -> None:
+    """Dry-run (default) or execute cleanup of unattached EBS volumes
+    and unassociated Elastic IPs.
+
+    EC2 instances are never touched by this command, regardless of flags.
+    """
+    findings, _scan_regions = _collect_findings(ctx)
+    cleanable = plan_cleanup(findings)
+    skipped_count = len(findings) - len(cleanable)
+
+    if not cleanable:
+        console.print(
+            "[green]Nothing eligible for cleanup -- no unattached EBS "
+            "volumes or unassociated Elastic IPs found.[/green]"
+        )
+        if skipped_count:
+            console.print(
+                f"[dim]{skipped_count} other finding(s) (e.g. EC2 "
+                "instances) are not eligible for automated cleanup and "
+                "were left untouched.[/dim]"
+            )
+        return
+
+    console.print(build_findings_table(cleanable))
+    if skipped_count:
+        console.print(
+            f"[dim]{skipped_count} other finding(s) (e.g. EC2 instances) "
+            "are not eligible for automated cleanup and were left "
+            "untouched.[/dim]"
+        )
+    console.print(
+        f"[yellow]DRY RUN: {len(cleanable)} resource(s) listed above "
+        "would be deleted. Nothing has been deleted.[/yellow]"
+    )
+
+    if not execute:
+        console.print(
+            "[dim]Pass --execute to actually delete these resources "
+            "(you will be asked to confirm).[/dim]"
+        )
+        return
+
+    console.print(
+        f"[bold red]About to permanently delete {len(cleanable)} "
+        "resource(s) listed above.[/bold red]"
+    )
+    if not typer.confirm("Type y to confirm deletion, anything else to abort"):
+        console.print("[yellow]Aborted. Nothing was deleted.[/yellow]")
+        raise typer.Exit(code=1)
+
+    session = _authenticated_session(ctx)
+    results = execute_cleanup(session, cleanable, ctx.obj["endpoint_url"])
+
+    deleted = [r for r in results if r.status == "deleted"]
+    errors = [r for r in results if r.status == "error"]
+    for result in deleted:
+        console.print(f"  [green]Deleted[/green] {result.resource_type} {result.resource_id}")
+    for result in errors:
+        console.print(f"  [red]Error[/red] {result.resource_type} {result.resource_id}: {result.error}")
+
+    console.print(f"[bold]{len(deleted)} deleted, {len(errors)} error(s).[/bold]")
+    if errors:
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
