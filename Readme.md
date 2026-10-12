@@ -27,13 +27,13 @@ The current `main` branch contains a working AWS audit pipeline for:
 - Rich terminal report export (`report --format terminal`)
 - Optimization score (0-100, based on finding risk levels)
 - EBS/Elastic IP cleanup with dry-run and explicit confirmation (`cleanup` / `cleanup --execute`)
+- Persisted cleanup audit log (`logs/cleanup-audit.jsonl`) for every confirmed deletion
 - Retry/backoff configuration
 - Automated tests using `pytest` and `moto`
 
 The following parts are currently **not implemented**:
 
 - EC2 cleanup (stop/resize) -- intentionally out of scope, see the Cleanup section
-- Cleanup audit logs
 - PyInstaller distribution workflow
 - CI/CD pipeline
 - PyPI/internal package distribution
@@ -279,8 +279,6 @@ No file is written, and `--output-dir` is ignored for this format. The table inc
 
 EC2 instances are never touched by this command, under any flag. Stopping or resizing a running instance carries more operational risk than deleting an orphaned volume or releasing an idle IP -- an instance flagged as low-CPU may still be serving traffic. Automated EC2 remediation is not implemented.
 
-There is also no cleanup audit log yet -- a persisted record of what was deleted and when is still on the roadmap.
-
 ### Dry run (default)
 
 ```bash
@@ -296,6 +294,18 @@ cloud-auditor cleanup --execute
 ```
 
 Runs the same dry-run preview, then asks for an explicit `y`/`N` confirmation before deleting anything. Only a literal `y` proceeds; anything else aborts with nothing deleted. Deletion happens resource-by-resource -- if one fails (e.g. it was already deleted elsewhere), the error is reported and the rest still proceed.
+
+### Cleanup audit log
+
+Every confirmed `cleanup --execute` run appends a record of what it attempted to `logs/cleanup-audit.jsonl`, one JSON object per line:
+
+```json
+{"timestamp": "2026-10-12T18:30:56.364246+00:00", "resource_id": "vol-dbbfb1888962a3a7f", "resource_type": "EBS Volume", "region": "us-east-1", "status": "deleted", "error": null}
+```
+
+Each line records the resource ID, resource type, region, outcome (`deleted` or `error`, with the error message if one occurred), and a UTC timestamp. The log is append-only -- it is never truncated or overwritten, so it accumulates a full history across every `--execute` run. The `logs/` directory is created automatically if it doesn't exist.
+
+The log is only written when `cleanup --execute` actually runs a deletion attempt (i.e. after `y` is confirmed). A dry run, or an aborted confirmation, writes nothing.
 
 ---
 
@@ -493,7 +503,8 @@ Cloud-Infrastructure-Auditor-Cost-Optimizer-CLI-/
 │   │   ├── utilization.py
 │   │   └── recommendations.py
 │   ├── cleanup/
-│   │   └── executor.py
+│   │   ├── executor.py
+│   │   └── audit_log.py
 │   ├── reporting/
 │   │   ├── json_report.py
 │   │   ├── csv_report.py
@@ -572,7 +583,7 @@ PyInstaller is not currently part of the project's declared dependencies or buil
 - [x] Explicit confirmation workflow
 - [x] Safe EBS cleanup
 - [x] Safe Elastic IP cleanup
-- [ ] Cleanup audit logs
+- [x] Cleanup audit logs
 
 ### Phase 5 — Distribution and CI
 

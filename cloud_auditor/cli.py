@@ -10,6 +10,7 @@ from rich.table import Table
 from cloud_auditor import __version__
 from cloud_auditor.audit.orchestrator import run_audit
 from cloud_auditor.auth.aws import AuthError, create_session, verify_credentials
+from cloud_auditor.cleanup.audit_log import write_cleanup_audit_log
 from cloud_auditor.cleanup.executor import execute_cleanup, plan_cleanup
 from cloud_auditor.reporting.csv_report import write_csv_report
 from cloud_auditor.reporting.json_report import write_json_report
@@ -245,6 +246,10 @@ def cleanup(
         console.print(f"  [red]Error[/red] {result.resource_type} {result.resource_id}: {result.error}")
 
     console.print(f"[bold]{len(deleted)} deleted, {len(errors)} error(s).[/bold]")
+
+    log_path = write_cleanup_audit_log(results)
+    console.print(f"[dim]Logged to {log_path}[/dim]")
+
     if errors:
         raise typer.Exit(code=1)
 

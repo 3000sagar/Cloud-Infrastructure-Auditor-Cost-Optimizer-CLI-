@@ -10,3 +10,4 @@ build/
 reports/*.json
 reports/*.csv
 .pytest_cache/
+logs/
