@@ -150,22 +150,6 @@ def test_unknown_ec2_instance_type_falls_back_to_default_rate():
     )
 
 
-def test_ec2_without_instance_type_uses_fallback_rate():
-    finding = Finding(
-        "i-1",
-        "EC2 Instance",
-        "us-east-1",
-        "Idle",
-        "Review",
-    )
-
-    [enriched] = enrich_with_savings_estimates([finding])
-
-    assert enriched.estimated_monthly_savings == round(
-        0.10 * 730,
-        2,
-    )
-    assert enriched.risk_level == "Medium"
 
 
 def test_unknown_resource_type_has_no_estimate():
@@ -305,3 +289,49 @@ def test_multiple_findings_reduce_score_correctly():
     ]
 
     assert calculate_optimization_score(findings) == 97
+
+
+
+def test_ec2_without_instance_type_has_no_estimate():
+    finding = Finding(
+        "i-1",
+        "EC2 Instance",
+        "us-east-1",
+        "Idle",
+        "Review",
+    )
+
+    [enriched] = enrich_with_savings_estimates([finding])
+
+    assert enriched.estimated_monthly_savings is None
+    assert enriched.risk_level == "Medium"
+
+
+def test_ec2_with_empty_instance_type_has_no_estimate():
+    finding = Finding(
+        "i-1",
+        "EC2 Instance",
+        "us-east-1",
+        "Idle",
+        "Review",
+        metadata={"instance_type": "   "},
+    )
+
+    [enriched] = enrich_with_savings_estimates([finding])
+
+    assert enriched.estimated_monthly_savings is None
+
+
+def test_ec2_with_invalid_instance_type_metadata_has_no_estimate():
+    finding = Finding(
+        "i-1",
+        "EC2 Instance",
+        "us-east-1",
+        "Idle",
+        "Review",
+        metadata={"instance_type": 123},
+    )
+
+    [enriched] = enrich_with_savings_estimates([finding])
+
+    assert enriched.estimated_monthly_savings is None
