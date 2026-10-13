@@ -2,6 +2,7 @@
 
 > A Python CLI for auditing AWS infrastructure, identifying common sources of cloud waste, and exporting audit findings to JSON or CSV.
 
+[![Tests](https://github.com/3000sagar/Cloud-Infrastructure-Auditor-Cost-Optimizer-CLI-/actions/workflows/tests.yml/badge.svg)](https://github.com/3000sagar/Cloud-Infrastructure-Auditor-Cost-Optimizer-CLI-/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![AWS](https://img.shields.io/badge/AWS-Boto3-orange?logo=amazon-aws)](https://aws.amazon.com/sdk-for-python/)
 [![CLI](https://img.shields.io/badge/CLI-Typer-009688)](https://typer.tiangolo.com/)
@@ -406,6 +407,10 @@ The repository currently contains tests covering:
 - Audit integration with mocked AWS resources
 
 No real AWS resources are required for the automated test suite.
+
+### Continuous Integration
+
+A GitHub Actions workflow (`.github/workflows/tests.yml`) runs the full test suite on every push and pull request to `main`, across Python 3.10, 3.11, and 3.12. No AWS credentials are configured or required in CI, since the suite runs entirely against `moto`. See the Tests badge at the top of this README for current status.
 
 ---
 
