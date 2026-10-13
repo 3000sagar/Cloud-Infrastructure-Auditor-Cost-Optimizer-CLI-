@@ -10,6 +10,7 @@ Verify estimates against AWS Cost Explorer before taking action.
 from __future__ import annotations
 
 import dataclasses
+import math
 from typing import List, Optional
 
 from cloud_auditor.scanners.base import Finding
@@ -54,19 +55,20 @@ DEFAULT_RISK_WEIGHT = 5
 def _estimate_savings(finding: Finding) -> Optional[float]:
     """Estimate monthly savings for a finding.
 
-    Returns None when the resource type is unsupported or required
-    metadata is missing or invalid.
+    Returns None when required metadata is missing or invalid.
+
+    For EC2 instances, known instance types use their configured rates.
+    Unknown instance types use the fallback rate. Missing or invalid
+    instance-type metadata returns None to avoid a misleading estimate.
     """
 
     if finding.resource_type == "EBS Volume":
         size_gb = finding.metadata.get("size_gb")
 
-        # Reject missing, non-numeric, boolean, non-finite, and
-        # non-positive volume sizes.
         if (
             isinstance(size_gb, bool)
             or not isinstance(size_gb, (int, float))
-            or not __import__("math").isfinite(size_gb)
+            or not math.isfinite(size_gb)
             or size_gb <= 0
         ):
             return None
@@ -79,8 +81,15 @@ def _estimate_savings(finding: Finding) -> Optional[float]:
     if finding.resource_type == "EC2 Instance":
         instance_type = finding.metadata.get("instance_type")
 
-        # Preserve the existing fallback behavior for unknown or
-        # missing instance types. This is an estimate, not actual cost.
+        # Missing or invalid metadata should not produce a price estimate.
+        if (
+            not isinstance(instance_type, str)
+            or not instance_type.strip()
+        ):
+            return None
+
+        # Known types use their configured rates. Unknown types use a
+        # fallback estimate, which should not be treated as actual pricing.
         hourly_rate = EC2_HOURLY_RATES.get(
             instance_type,
             DEFAULT_EC2_HOURLY_RATE,
@@ -143,4 +152,3 @@ def calculate_optimization_score(findings: List[Finding]) -> int:
         )
 
     return max(0, 100 - penalty)
-
