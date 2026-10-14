@@ -65,5 +65,16 @@ def run_all_scanners(
                     recommendation="Check IAM permissions for this resource type",
                 )
             )
-
-    return enrich_with_savings_estimates(findings)
+        except Exception as exc:
+            findings.append(
+                Finding(
+                    resource_id="-",
+                    resource_type=f"{name} Scanner",
+                    region=region,
+                    issue=f"Unexpected scan failure: {exc}",
+                    recommendation=(
+                        "Check application logs and scanner configuration"
+                    ),
+                )
+            )
+    return findings
