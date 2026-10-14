@@ -31,12 +31,12 @@ The current `main` branch contains a working AWS audit pipeline for:
 - Persisted cleanup audit log (`logs/cleanup-audit.jsonl`) for every confirmed deletion
 - Retry/backoff configuration
 - Automated tests using `pytest` and `moto`
+- GitHub Actions CI, running the full test suite on every push/PR to `main` across Python 3.10, 3.11, and 3.12
+- Standalone executable packaging via PyInstaller
 
 The following parts are currently **not implemented**:
 
 - EC2 cleanup (stop/resize) -- intentionally out of scope, see the Cleanup section
-- PyInstaller distribution workflow
-- CI/CD pipeline
 - PyPI/internal package distribution
 
 **Scope:** AWS only. GCP and Azure are not implemented in this repository.
@@ -459,6 +459,37 @@ cloud-auditor --help
 
 ---
 
+## Standalone Executable
+
+For environments without Python installed, the CLI can be bundled into a single standalone executable with PyInstaller. No install step, no virtual environment -- just run the binary.
+
+### Building
+
+Install the dev dependencies (includes PyInstaller), then build:
+
+```bash
+pip install -r requirements-dev.txt
+pyinstaller --onefile --name cloud-auditor --collect-all boto3 --collect-all botocore cloud_auditor/__main__.py
+```
+
+The `--collect-all boto3 --collect-all botocore` flags are required, not optional -- PyInstaller does not automatically bundle Boto3/Botocore's service-definition data files (the JSON files describing every AWS API call). Without them, the executable launches and `--help` works fine, but every actual AWS call fails. The build output is `dist/cloud-auditor.exe` (Windows) or `dist/cloud-auditor` (Linux/macOS).
+
+### Verifying
+
+The build was manually verified end-to-end against a local `moto_server`, with the Python virtual environment fully deactivated, confirming the executable is genuinely standalone:
+
+```text
+cloud-auditor.exe --endpoint-url http://localhost:5000 --region us-east-1 whoami
+cloud-auditor.exe --endpoint-url http://localhost:5000 --region us-east-1 regions
+cloud-auditor.exe --endpoint-url http://localhost:5000 --region us-east-1 audit
+```
+
+`audit` in particular exercises the exact code path (`DescribeVolumes`) that depends on the bundled Botocore service data, so a successful finding confirms the data-bundling flags worked correctly.
+
+`build/`, `dist/`, and the generated `.spec` file are git-ignored -- they're machine-specific build output, not source. Anyone can reproduce the executable locally with the command above.
+
+---
+
 ## AWS Permissions
 
 For normal read-only auditing, the scanners and region discovery use AWS API calls corresponding to:
@@ -491,8 +522,12 @@ The repository currently looks like this:
 
 ```text
 Cloud-Infrastructure-Auditor-Cost-Optimizer-CLI-/
+├── .github/
+│   └── workflows/
+│       └── tests.yml
 ├── cloud_auditor/
 │   ├── __init__.py
+│   ├── __main__.py
 │   ├── cli.py
 │   ├── audit/
 │   │   └── orchestrator.py
@@ -550,8 +585,11 @@ Cloud-Infrastructure-Auditor-Cost-Optimizer-CLI-/
 ### Packaging
 
 - Setuptools
+- PyInstaller (standalone executable builds)
 
-PyInstaller is not currently part of the project's declared dependencies or build configuration.
+### CI
+
+- GitHub Actions
 
 ---
 
@@ -593,9 +631,9 @@ PyInstaller is not currently part of the project's declared dependencies or buil
 ### Phase 5 — Distribution and CI
 
 - [x] Automated unit/integration-style tests with moto
-- [ ] Additional live-AWS integration tests
-- [ ] PyInstaller packaging
-- [ ] CI/CD
+- [ ] Additional live-AWS integration tests -- blocked: no AWS free tier remaining to test against
+- [x] PyInstaller packaging
+- [x] CI/CD
 - [ ] PyPI/internal package distribution
 
 ---
