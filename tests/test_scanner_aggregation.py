@@ -52,3 +52,26 @@ def test_one_failing_scanner_does_not_abort_the_audit():
     assert "EBS Scanner" in types
     assert "Elastic IP" in types
     assert any("AccessDenied" in f.issue for f in findings)
+
+
+def test_unexpected_scanner_error_does_not_abort_the_audit():
+    with patch(
+        EBS,
+        side_effect=RuntimeError("Unexpected failure"),
+    ), patch(
+        EIP,
+        return_value=[_finding("eipalloc-1", "Elastic IP")],
+    ), patch(
+        EC2,
+        return_value=[],
+    ):
+        findings = run_audit(
+            session=object(),
+            regions=["us-east-1"],
+        )
+
+    types = [f.resource_type for f in findings]
+
+    assert "EBS Scanner" in types
+    assert "Elastic IP" in types
+    assert any("Unexpected failure" in f.issue for f in findings)
