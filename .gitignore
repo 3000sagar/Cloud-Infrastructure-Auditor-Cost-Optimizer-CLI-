@@ -11,3 +11,7 @@ reports/*.json
 reports/*.csv
 .pytest_cache/
 logs/
+
+dist/
+build/
+*.spec
