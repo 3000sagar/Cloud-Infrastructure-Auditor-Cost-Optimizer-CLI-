@@ -3,3 +3,5 @@ moto[server]>=5.0
 pyinstaller>=6.0
 
 
+
+build>=1.0
